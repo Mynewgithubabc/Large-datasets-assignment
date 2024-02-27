@@ -1,0 +1,423 @@
+---
+title: "Large datasets assignment"
+output: html_document
+date: "2024-02-26"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r cars}
+summary(cars)
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r}
+#Install the package Rcompadre, which will allow you to access COMADRE (and COMPADRE) online
+#install.packages("Rcompadre")
+#install.packages("tidyverse) # this is for data wrangling
+
+#Call the library so you can start using it:
+library(Rcompadre)
+library(tidyverse)
+
+#Fetch the most recent database version from www.compadre-db.org with:
+comadre <- cdb_fetch("comadre") 
+#This function takes comadre from the webiste: there are two data bases it deals with: comadre vs compadre: we are telling it to fetch comadre, which is for mammals (not plants)
+
+#The command 'dim' outputs the dimensions of an object, thus giving you an idea of how many row entries and column variables there are in the original database: tells you the dimensions of the database: 
+dim(comadre)
+
+
+```
+
+Exploring the metadata in comadre. Metadata is the extra bits of information surrounding your data. Eg if your data is heights of different trees, metadata is location and species data 
+
+```{r}
+#Explore the metadata in COMADRE
+comadre@data
+#Choosing the taxonomic subset of animals, reptiles. 
+
+```
+```{r}
+
+#Examining all the possible classes in the dataset I could choose from 
+unique_classes <- unique(comadre@data$Class)
+# Print the unique classes
+print(unique_classes)
+
+#Finding the number of unique species in the class Reptilia 
+```
+
+
+```{r}
+#subsetting our data to only include reptiles, and to only include wild individuals, not captive individuals, and species that are not constrained geographically 
+comadre1 <- subset(comadre,
+                   # Consider only reptiles
+                   Class == "Reptilia" & 
+                 
+                  # studied under "control" (i.e. no treatment) conditions
+                   MatrixTreatment == "Unmanipulated" &
+                   # and only from "W"ild populations
+                   MatrixCaptivity == "W")     
+
+#taking a subset of the whole dataset to make a smaller dataset to make a subset of only the species we are interested in. The criterium being imposed are: just reptiles, with no geographical constraint. Matrix treatement (find out more and go to the URL to find in detail description): dynamics of huge populations under natural conditions. Establishing relationships between generation time and conservation studies we need to ensure that statistical inferences are to do with these and nothing else. We subset the data to allow us to draw fair comparisons? The last criterium is on whether they are from wild populations or not.
+
+#ensuring that there are at least 10 unique species in this subset 
+
+#Examining all the possible classes in the dataset I could choose from 
+unique_species_reptilia <- unique(comadre1$Species)
+# Print the unique classes
+length(unique_species_reptilia)
+#There are 28 unique species of reptiles in this dataset. 
+
+#calculating the dimensions of my new subsetted comadre1: 
+dim(comadre1)
+
+```
+
+We will use the function cdb_flag() to add columns to the database flagging potential issues with these MPMs, such as missing values, or MPMs that don’t meet assumptions necessary to calculate population growth rates (like ergodicity, irreducibility, or primitivity 
+
+```{r}
+#we cannot calculate population growth rate from any data that has NAs attached or is not ergodic. 
+#ergodic means that there is statistical equivalence between mean values measured over time and mean values measured across space 
+
+#we are therefore further subsetting the data based of of these requirements 
+comadre_flags <- cdb_flag(comadre1)
+comadre_sub <- subset(comadre_flags,
+                      check_NA_A == FALSE &
+                      check_ergodic == TRUE)
+
+#Check size of subset data again:
+dim(comadre_sub)
+head(comadre_sub) 
+
+```
+
+Three fundamental factors impacting populations are: 
+Reproduciton 
+Survival 
+Growth / development. 
+These are things any species needs to do to fulfil its rule to pass on its genes and survive, reproduce and close the loop. 
+Reproduction comes in different flavours: sexual vs asexual reproduction (clonality). Survival and growth: parts of the same coin. Growth depends on survival, you cant grow tomorrow if you die today. some species have the ability to decrease in size so shrinkage and growth are part of the same thing. Any population matrix is a three dimensinal layer / cake. 
+
+```{r}
+#Explore some MPMs in your subset database
+#The first MPM stored in your data is:
+matA(comadre_sub)[[1]] #the subset contains many MPMs, this is just one of them 
+#Extracts a full matrix population model from a subset of comadre: this is the three layered pancake. We need to know which numbers correspond to which layer. 
+#The value that is 76 is reproduction as it cannot be survival because the value is more than 1 whereas survival should be bounded between 0 and 1 
+
+#We are now going to add the submatrices U, F and C: 
+matU(comadre_sub)[[1]] #This is the survival component of the matrix, values are between 0 and 1 
+matF(comadre_sub)[[1]] #the sexual component of the matrix population model 
+matC(comadre_sub)[[1]] #the clonal component of the matrix population model, makes sense that it is all 0s  
+
+comadre_sub@data[1,] #This line shows one portion of the matrix, the first row
+```
+the population growth rate ($\lambda$) corresponds to the dominant eigenvalue of the MPM *A*, and it projects the rate of growth (if $\lambda$ > 1) or decline ($\lambda$ < 1) of the population. One of the three definitions of generation time (T) is the mean age of reproductive individuals in the population. This life history trait is tightly linked to the rate of population turnover, and it is frequently used in assessments of vulnerability of the IUCN.
+
+1: Show a histogram of population growth rate and a separate histogram of generation time of my subset. 
+
+Generating a histogram for population growth rate 
+
+```{r}
+#Obtain population growth rates using the function 
+#"lambda" from the R package "popbio
+#install.packages("popbio") (need an if loop in the code to install this if it has not yet been installed.)
+library("popbio")
+
+#Using lapply (which applies a function to every element in a list), 
+#we will calculate the population growth rate (lambda) for each matrix
+#looking at the subset: from our subset we call matA and apply the lambda function to it which extracts the growth rate 
+comadre_sub$lambda <- unlist(lapply(matA(comadre_sub), popbio::lambda))
+
+#Examine the distribution of population growth rates:
+hist(comadre_sub$lambda, xlab= "Population growth rate", main = "Frequency distribution of Population growth rates")
+abline(v = 1, col = 'red', lty = 2, lwd = 2) #this histogram shows the frequency distribution of population growth rates
+#This line of code adds a verticle line at x = 1. If population growth rate = 1 this means the population is not changing in size and is at demographic equilibrium. If the conditions under which the matrix was parameterized dont change the population will remain stable 
+#Populations change over time so if you want to consider a population over time the value of lambda changes, for example this might come from an abnormally good year. if you assume as many resources and that density dependence isnt important (hasnt reached carrying capacity) lambda would be higher than one. So unless you calculate lambda through a lot of matrix following populations over a long time this is problematic. 
+
+
+#hist(comadre_sub$MatrixID) #this is a historgram showing the distribution of the matrices? 
+
+
+```
+The (mean?) frequency distributoin of the population centers around 1. This makes sense because this means the population is not changing in size and is at demographic equilibrium.
+
+
+Generating a histogram for distributions of generation time: 
+
+```{r}
+#To calculate generation time, we will use the R package "Rage"
+#install.packages("Rage")
+library("Rage")
+
+#Again using lapply, we will now use the U and F matrices 
+#to calculate the generation time
+comadre_sub$gen_T <- mapply(Rage::gen_time, matU(comadre_sub), matF(comadre_sub))
+
+#To calculate population growth rate you can claculate this with matrix A. But to calculate generation time you need to separate the processes. So instead of feeding MAT A we need the sub matrix U, survival and growth, and F which includes sexual reproduction. Splitting the matrix up. 
+
+#In the code above, the accessor function matA() is used to extract a list 
+#of projection matrices (the full matrix, matA) from every row of comadre_sub. 
+#There are also accessor functions for the matrix subcomponents (matU(), 
+#matF(), matC()), and for many other parts of the database too.
+
+#Examine the distribution of generation times:
+#Generation time is the number of years from birth to reproduction. There are actually three definitions but the most accapted is this. Or can think of as the mean age at which individuals reproduce.
+
+#Why do we care? Important: populations with shorter generation times can respond faster/ evolve faster in response to stress. Species with shorter generation times evolve faster. If you have information about generation times, can you come up with a hypothesis linking conservation status and generation time? 
+#We can hypothesize that those with better conservation status have shorter generation times, less endangered.
+
+hist(comadre_sub$gen_T, xlab = "Generation time (years)", main = "Frequency distribution of generation times")
+#there is a higher frequency of populations with shorter generation times 
+
+```
+There is a higher frequency of populations with shorter generation times. This makes sense because they can evolve faster in response to stress so are less likely to be endangered (we can hypothesize this)
+
+
+2. Fit a model to explore whether the generation time and population growth rate of your species’ populations are correlated. Would you have expected them to be correlated? Why?
+
+Attempt for question 2: 
+
+```{r}
+#The data about population growth rate is: 
+comadre_sub$lambda
+#The data about generation time is: 
+comadre_sub$gen_T
+
+
+
+#Checking if there are NAs in lambda values and removing these. Asking out of all the lamdas are there some that are nas? This is a conditional line that gets rid of nas that in this case isn't fulfilled as there isnt nas in this dataset. If you rerun this in another dataset that has nas it would work.
+if (length(which(is.na(comadre_sub$lambda)))>0) {
+  comadre_sub <- comadre_sub[-which(is.na(comadre_sub$lambda)),]
+}
+
+if (length(which(is.na(comadre_sub$gen_T)))>0) {
+  comadre_sub <- comadre_sub[-which(is.na(comadre_sub$gen_T)),]
+}
+
+
+if (length(which(is.infinite(comadre_sub$gen_T)))>0) {
+  comadre_sub <- comadre_sub[-which(is.infinite(comadre_sub$gen_T)),]
+}
+
+```
+
+```{r}
+#What kind of model do I want to use? 
+#A linear regression analysis 
+
+# Fit a linear regression model
+linear_model <- lm(comadre_sub$lambda ~ comadre_sub$gen_T)
+
+# Summarize the model
+summary(linear_model)
+
+```
+The p value is > 0.05 so there is no statistically significant linear correlation between between generation time and population growth rate.
+
+EXPLAIN WHY YOU WOULD HAVE EXPECTED TO SEE A CORRELATION 
+
+
+3: 
+Obtaining conservation status of these species from the IUCN Red list. Then explore, using statistical methods whether generation time and population growth rate predict conservation status 
+
+Note that the object 'comadre_sub' contains quite a few MPMs for each species. Sometimes these MPMs correspond to different years (e.g., 2000 to 2001, 2001, to 2002...) within the same population, and sometimes they may refer to different populations, or even come from different publications/research groups. As such, for the purposes of today's exercise, and in the interest of time, we will only sample one MPM per species:
+```{r, message=FALSE, error=FALSE, warning=FALSE}
+#Identifying which species names are unique:
+unique_comadre <- unique(comadre_sub$SpeciesAccepted)
+#If there are multiple treatments on a species there is more than one matrix
+length(unique_comadre)
+#Resulting in 25 reptile species 
+
+#We could sample a single MPM wihtin each species in different ways, but here we are going to simply selecting the first entry in the whole of comadre_sub where there is a new species using the command 'duplicated'. This function examines element by element in a vector whether the next element has already appeared before in the vector.
+comadre_sub <- comadre_sub[which(duplicated(comadre_sub$SpeciesAccepted)==FALSE),] #after executing this line of code, comadre_sub will only contain unique rows based on the values in the column 'SpeciesAccepted', so each MPM only represents one species 
+dim(comadre_sub)
+
+
+
+```
+
+```{r}
+#Install and call the R package 
+#install.packages("taxize")
+library(taxize)
+#https:/apiv3.iucnredlist.org', provide IUCN access.  ?
+
+API_token <- "8d9c556bb4aa2efeacdc49775c0d0514b42139c96d5ed0f6b9ca5a495ffa49a4"
+#Using the API token to extract information from IUCN 
+#run the summary from IUCN for our species names
+IUCN.list <- iucn_summary(comadre_sub$SpeciesAccepted, distr_detail = FALSE, key = API_token)
+
+```
+
+
+Carrying out some data wrangling in order to just obtain information on the IUCN redlist status of each of our unique reptile species, of which there are 25. We are then binding this information back onto the comadre data 
+
+```{r}
+#This IUCN list contains a lot of information for each species. We just want 
+#their classification and their species name to link to the species
+library(tidyverse)
+
+IUCN_data <- lapply(IUCN.list, function(x){ #applies this function to each element in the IUCN list
+  return(tibble(IUCNstatus = x$status))}) %>%  #creates a tibble with one column called ICN status containing status information from each element x, resulting in a list of tibbles.
+  bind_rows() %>% #uses the pipe operator to pass the list of tibbles generated above to the bind rows function which binds the rows of the tibbles together combining them into a single tibble
+  mutate(SpeciesAccepted = comadre_sub$SpeciesAccepted) #uses the pipe operator to pass the combined tibble from the previous step to the mutate function. Within the mutate function, a new column called species accepted is added to the tibble containing values from the Species accepted column of the comadre_sub dataframe which we made before. 
+#This function essentially combines status information from each elenent from the IUCN list into a single tibble and then adds a new column, species asccepted, to this tibble containing values from the species accepted column of the comadre_sub data frame. 
+
+
+
+#Now link back to original data using the left_join() function
+comadre_iucn <- comadre_sub %>%
+  left_join(x = ., y = IUCN_data, by = "SpeciesAccepted") %>% #left join merges comadre_sub and the IUCN_data tibble we just made above 
+  mutate(IUCNstatus = case_when( #we are modifying columns in the resulting joined dataset in the case when...
+    #we are assigning different values to IUCNstatus from the IUCN_data tibble
+    IUCNstatus == "EN" ~ "Endangered",
+    IUCNstatus == "VU" ~ "Vulnerable",
+    IUCNstatus == "NT" ~ "Near Threatened",
+    IUCNstatus == "LC" ~ "Least Concern",
+    is.na(IUCNstatus) == TRUE ~ "Not Assessed"),
+    IUCNstatus = factor(IUCNstatus, #converts IUCN status column to a factor variable. This specifies the order of factor levels to ensure proper ordering of categories when plotting or analysing data
+                        levels = c("Endangered","Vulnerable",
+                                   "Near Threatened","Least Concern",
+                                   "Not Assessed")))
+#whenever it is vulnerable, writing it as Vu, etc. 
+dim(comadre_iucn)
+
+#We are going to flatten out this object into a simple data.frame
+comadre_iucn <- as.data.frame(comadre_iucn) 
+#converting the comadre_iucn tibble? we just made into a data frame
+
+#Adding colours to the IUCN categories
+comadre_iucn$iucn_colour <- NA
+#Making a variable to accomodate colour 
+comadre_iucn$iucn_colour[which(comadre_iucn$IUCNstatus == "Endangered")] <- "Orange" 
+comadre_iucn$iucn_colour[which(comadre_iucn$IUCNstatus == "Vulnerable")] <- "Yellow"
+comadre_iucn$iucn_colour[which(comadre_iucn$IUCNstatus == "Near Threatened")] <- "Dark green"
+comadre_iucn$iucn_colour[which(comadre_iucn$IUCNstatus == "Least Concern")] <- "Green"
+comadre_iucn$iucn_colour[which(comadre_iucn$IUCNstatus == "Not Assessed")] <- "Blue"
+
+#there will now be a new column in comadre_uicn called iucn_colour indicating the assigned colour for each row based on its corresponding IUCN status. 
+
+head(comadre_iucn) 
+```
+
+Now explore both visually and statistically the relationships between generation time, on the one hand, and population growth rate, on the other hand. 
+
+
+
+```{r}
+#Exploring the relationship between generation time and population growth rate 
+ggplot(comadre_iucn, aes(x = IUCNstatus, y = gen_T, 
+                         fill = IUCNstatus)) + 
+  geom_boxplot(show.legend = F) +
+  geom_jitter(width = 0.2, show.legend = F) +
+  scale_fill_viridis_d(option = "B", begin = 0.3, end = 0.8) +
+  labs(x = "IUCN redlist status", y = "Generation time (years)") +
+  theme_classic(base_size = 14)
+#Created a boxplot of generation time against IUCN status. We made a hypothesis on how generation time is related to conservation studies. We predicted that species of shorter generation times should be less likely to be endangered. 
+
+ANOVA_gen_T <- aov(gen_T~IUCNstatus, data = comadre_iucn)
+summary(ANOVA_gen_T)
+#The p value is > 0.05 so the relationship is not significant 
+
+#Now plotting population growth rate against IUCN status 
+ggplot(comadre_iucn, aes(x = IUCNstatus, y = lambda, 
+                         fill = IUCNstatus)) + 
+  geom_boxplot(show.legend = F) +
+  geom_jitter(width = 0.2, show.legend = F) +
+  scale_fill_viridis_d(option = "B", begin = 0.3, end = 0.8) +
+  labs(x = "IUCN redlist status", y = "Population growth rate") +
+  theme_classic(base_size = 14)
+
+ANOVA_lambda <- aov(lambda~IUCNstatus, data = comadre_iucn)
+summary(ANOVA_lambda)
+#P is also > 0.05 so the relationship is not significant 
+
+```
+None of the relationships are statistically significant. Why?? 
+
+Question 4: 
+Plotting the values of generatin time and population growth rate of your species on the phylogeny provided to you. Is there any visual evidence of phylogenetic inertia in those traits? Why? 
+
+(phylogenetic inertia refers to the limitations on future evolutionary pathways that have been imposed by previous adaptations)
+
+The first step is to run a taxonomic check on your species names, in case these are not taxonomically accepted ("up to date" according the latest biological evidence regarding species relationships)
+
+```{r}
+
+#Once again, state your species names
+my_taxa <- comadre_iucn$SpeciesAccepted #extracts values from SpeciesAccepted collumn of the comadre_iucn data frame and assigns them to a new variable named my_taxa. These are species names 
+#We are checking whether the species are taxonomically accepted 
+
+#Use the command 'tnrs_match_names' to run my_taxa through the API of ROTL to check species names
+resolved_names <- rotl::tnrs_match_names(names = my_taxa) #uses the function from rotl package to match taxonomic names in the my_taxa vector we just made against a taxonomic name resolution service, TNRS, provided by open tree of life / OTL project. The function takes a vector of taxonomic names as input and returns a list of matched names and their corresponding taxonomic identifiers, Taxon IDs or status of resolution 
+
+#so these lines of code check whether the species names in the SpeciesAccepted column of the comadre_iucn dataframe are taxonomically accepted by running them through the TNRS provided by the open tree of life project. The result is stored in the resolved_names variable which contains information about resolution status of each species name
+
+#Inspect the produced table named "resolved_names", which provides taxonomically accepted names, and additional info, such as the unique ott_id that we can then use to obtain phylogenetic tree information from OTL
+head(resolved_names)
+#approximate match means: it is true if it finds suggestions of names you might want to consider as an alternative. The species xenosaurus sp. is an approximate match. What should I do? 
+#OTT ID is the unique number given to any species across the tree of life. 
+#We need to eliminate any species whose ott_id is NA to proceed with the following steps and then re-do the previous steps:
+comadre_iucn$ott_id <- resolved_names$ott_id
+#Within this there is a variable called ott_id which we are interested, we are creating a variable called this and saving this information in our data frame 
+dim(comadre_iucn)
+comadre_iucn <- comadre_iucn[-which(is.na(comadre_iucn$ott_id)),]
+#Getting rid of any NAs 
+dim(comadre_iucn)
+
+my_taxa <- comadre_iucn$SpeciesAccepted
+#Making a new dataset with the currently accepted name of the species 
+resolved_names <- rotl::tnrs_match_names(names = my_taxa)
+comadre_iucn$OTL_unique_name <- resolved_names$unique_name
+#Passing on this information to hte repository to make sure all these are currently accepted names 
+
+#Adding the names of the species to the data.frame for later merging to the phylogenetic tree with this data.frame
+#Data frame you use needs to have species names as row names 
+row.names(comadre_iucn) <- resolved_names$unique_name
+
+#Obtain the phylogenetic tree for your species
+#Making a tree from the dataset we have made: the open tree of life package: telling the open tree of life we have unique IDs and take the full phylogeny and return to me the phylogeny containing only the hits corresponding to my mammal species 
+my_tree <- rotl::tol_induced_subtree(resolved_names$ott_id)
+
+#Plot the tree:
+plot(my_tree)
+
+#Delete the ott ids for easier plotting:to make it less information dense 
+my_tree$tip.label <- gsub('_ott', '', my_tree$tip.label)
+#substituting _ott with nothing, ie deleting it. 
+my_tree$tip.label <- gsub('[0-9]+', '', my_tree$tip.label)
+#substituting any numeric combination between 0 and 9 and all numbers in between with nothing ie deleting all the numbers 
+my_tree$tip.label <- gsub('_', ' ', my_tree$tip.label)
+
+my_tree$tip.label
+
+#Just to make things more interesting, you'll notice that node number 16 in this tree has a weird name "mrcaottott", which is a mistake we have reported to OTL. This should be Alouatta seniculus, the Colombian red howler. Let's fix it!
+my_tree$tip.label[my_tree$tip.label=="mrcaottott"] <- "Alouatta seniculus"
+
+
+plot(my_tree)
+
+#Plot it in radial format
+plot(my_tree, type = "fan")
+
+```
