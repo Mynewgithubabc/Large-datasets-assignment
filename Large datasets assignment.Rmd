@@ -29,6 +29,14 @@ plot(pressure)
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
 
 ```{r}
+#Clear the R environment: if anything from a previous session is here it clears the objects that were made before. 
+rm(list = ls())
+
+```
+
+```{r}
+
+
 #Install the package Rcompadre, which will allow you to access COMADRE (and COMPADRE) online
 #install.packages("Rcompadre")
 #install.packages("tidyverse) # this is for data wrangling
@@ -62,7 +70,7 @@ unique_classes <- unique(comadre@data$Class)
 # Print the unique classes
 print(unique_classes)
 
-#Finding the number of unique species in the class Reptilia 
+#Finding the number of unique species in the class Reptilia ?
 ```
 
 
@@ -255,7 +263,7 @@ dim(comadre_sub)
 
 
 ```
-
+Accessing the IUCN data:
 ```{r}
 #Install and call the R package 
 #install.packages("taxize")
@@ -277,25 +285,21 @@ Carrying out some data wrangling in order to just obtain information on the IUCN
 #their classification and their species name to link to the species
 library(tidyverse)
 
-IUCN_data <- lapply(IUCN.list, function(x){ #applies this function to each element in the IUCN list
-  return(tibble(IUCNstatus = x$status))}) %>%  #creates a tibble with one column called ICN status containing status information from each element x, resulting in a list of tibbles.
-  bind_rows() %>% #uses the pipe operator to pass the list of tibbles generated above to the bind rows function which binds the rows of the tibbles together combining them into a single tibble
-  mutate(SpeciesAccepted = comadre_sub$SpeciesAccepted) #uses the pipe operator to pass the combined tibble from the previous step to the mutate function. Within the mutate function, a new column called species accepted is added to the tibble containing values from the Species accepted column of the comadre_sub dataframe which we made before. 
-#This function essentially combines status information from each elenent from the IUCN list into a single tibble and then adds a new column, species asccepted, to this tibble containing values from the species accepted column of the comadre_sub data frame. 
-
-
+IUCN_data <- lapply(IUCN.list, function(x){
+  return(tibble(IUCNstatus = x$status))}) %>% 
+  bind_rows() %>% 
+  mutate(SpeciesAccepted = comadre_sub$SpeciesAccepted)
 
 #Now link back to original data using the left_join() function
 comadre_iucn <- comadre_sub %>%
-  left_join(x = ., y = IUCN_data, by = "SpeciesAccepted") %>% #left join merges comadre_sub and the IUCN_data tibble we just made above 
-  mutate(IUCNstatus = case_when( #we are modifying columns in the resulting joined dataset in the case when...
-    #we are assigning different values to IUCNstatus from the IUCN_data tibble
+  left_join(x = ., y = IUCN_data, by = "SpeciesAccepted") %>% 
+  mutate(IUCNstatus = case_when(
     IUCNstatus == "EN" ~ "Endangered",
     IUCNstatus == "VU" ~ "Vulnerable",
     IUCNstatus == "NT" ~ "Near Threatened",
     IUCNstatus == "LC" ~ "Least Concern",
     is.na(IUCNstatus) == TRUE ~ "Not Assessed"),
-    IUCNstatus = factor(IUCNstatus, #converts IUCN status column to a factor variable. This specifies the order of factor levels to ensure proper ordering of categories when plotting or analysing data
+    IUCNstatus = factor(IUCNstatus, 
                         levels = c("Endangered","Vulnerable",
                                    "Near Threatened","Least Concern",
                                    "Not Assessed")))
@@ -304,7 +308,6 @@ dim(comadre_iucn)
 
 #We are going to flatten out this object into a simple data.frame
 comadre_iucn <- as.data.frame(comadre_iucn) 
-#converting the comadre_iucn tibble? we just made into a data frame
 
 #Adding colours to the IUCN categories
 comadre_iucn$iucn_colour <- NA
@@ -315,9 +318,9 @@ comadre_iucn$iucn_colour[which(comadre_iucn$IUCNstatus == "Near Threatened")] <-
 comadre_iucn$iucn_colour[which(comadre_iucn$IUCNstatus == "Least Concern")] <- "Green"
 comadre_iucn$iucn_colour[which(comadre_iucn$IUCNstatus == "Not Assessed")] <- "Blue"
 
-#there will now be a new column in comadre_uicn called iucn_colour indicating the assigned colour for each row based on its corresponding IUCN status. 
+head(comadre_iucn)
 
-head(comadre_iucn) 
+
 ```
 
 Now explore both visually and statistically the relationships between generation time, on the one hand, and population growth rate, on the other hand. 
@@ -356,40 +359,56 @@ summary(ANOVA_lambda)
 None of the relationships are statistically significant. Why?? 
 
 Question 4: 
-Plotting the values of generatin time and population growth rate of your species on the phylogeny provided to you. Is there any visual evidence of phylogenetic inertia in those traits? Why? 
+Plotting the values of generation time and population growth rate of your species on the phylogeny provided to you. Is there any visual evidence of phylogenetic inertia in those traits? Why? 
 
 (phylogenetic inertia refers to the limitations on future evolutionary pathways that have been imposed by previous adaptations)
 
 The first step is to run a taxonomic check on your species names, in case these are not taxonomically accepted ("up to date" according the latest biological evidence regarding species relationships)
 
+
+
 ```{r}
 
+
+
 #Once again, state your species names
-my_taxa <- comadre_iucn$SpeciesAccepted #extracts values from SpeciesAccepted collumn of the comadre_iucn data frame and assigns them to a new variable named my_taxa. These are species names 
+my_taxa <- comadre_iucn$SpeciesAccepted
 #We are checking whether the species are taxonomically accepted 
 
 #Use the command 'tnrs_match_names' to run my_taxa through the API of ROTL to check species names
-resolved_names <- rotl::tnrs_match_names(names = my_taxa) #uses the function from rotl package to match taxonomic names in the my_taxa vector we just made against a taxonomic name resolution service, TNRS, provided by open tree of life / OTL project. The function takes a vector of taxonomic names as input and returns a list of matched names and their corresponding taxonomic identifiers, Taxon IDs or status of resolution 
+resolved_names <- rotl::tnrs_match_names(names = my_taxa)
+#If the subset you choose is quite big the code should take a bit longer to run but should be fine. 
 
-#so these lines of code check whether the species names in the SpeciesAccepted column of the comadre_iucn dataframe are taxonomically accepted by running them through the TNRS provided by the open tree of life project. The result is stored in the resolved_names variable which contains information about resolution status of each species name
+#The species Hystrix refossa has not been found in the ROTL. This is because the species is an extinct large procupine. All other species passed the quality taxonomic check.
 
 #Inspect the produced table named "resolved_names", which provides taxonomically accepted names, and additional info, such as the unique ott_id that we can then use to obtain phylogenetic tree information from OTL
-head(resolved_names)
-#approximate match means: it is true if it finds suggestions of names you might want to consider as an alternative. The species xenosaurus sp. is an approximate match. What should I do? 
+resolved_names
+#approximate match means: it is true if it finds suggestions of names you might want to consider as an alternative but in this case it is all fine. 
 #OTT ID is the unique number given to any species across the tree of life. 
 #We need to eliminate any species whose ott_id is NA to proceed with the following steps and then re-do the previous steps:
+#the approximate match is also flagged 'incertae sedis' which means its precise location in the tree of life is uncertain / disputed. there is insufficient data to confidently place a taxon within a specific clade. 
+
+#it has therefore been pruned from the latest tree in the open tree of life. I am therefore going to prune it from my data. 
+
+```
+
+```{r}
 comadre_iucn$ott_id <- resolved_names$ott_id
 #Within this there is a variable called ott_id which we are interested, we are creating a variable called this and saving this information in our data frame 
 dim(comadre_iucn)
-comadre_iucn <- comadre_iucn[-which(is.na(comadre_iucn$ott_id)),]
+comadre_iucn <- comadre_iucn[is.na(comadre_iucn$ott_id) == FALSE,]
 #Getting rid of any NAs 
 dim(comadre_iucn)
+
+```
+
+```{r}
 
 my_taxa <- comadre_iucn$SpeciesAccepted
 #Making a new dataset with the currently accepted name of the species 
 resolved_names <- rotl::tnrs_match_names(names = my_taxa)
 comadre_iucn$OTL_unique_name <- resolved_names$unique_name
-#Passing on this information to hte repository to make sure all these are currently accepted names 
+#Passing on this information to the repository to make sure all these are currently accepted names 
 
 #Adding the names of the species to the data.frame for later merging to the phylogenetic tree with this data.frame
 #Data frame you use needs to have species names as row names 
@@ -398,6 +417,12 @@ row.names(comadre_iucn) <- resolved_names$unique_name
 #Obtain the phylogenetic tree for your species
 #Making a tree from the dataset we have made: the open tree of life package: telling the open tree of life we have unique IDs and take the full phylogeny and return to me the phylogeny containing only the hits corresponding to my mammal species 
 my_tree <- rotl::tol_induced_subtree(resolved_names$ott_id)
+
+#the OTL unique name and the species name for OTU 3091 don't match up: the species name is zonosaurus sp but the name we originally searched for was xenosaurus sp.
+
+```
+
+```{r}
 
 #Plot the tree:
 plot(my_tree)
@@ -419,5 +444,19 @@ plot(my_tree)
 
 #Plot it in radial format
 plot(my_tree, type = "fan")
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
 
 ```
