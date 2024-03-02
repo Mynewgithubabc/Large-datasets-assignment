@@ -280,6 +280,8 @@ IUCN.list <- iucn_summary(comadre_sub$SpeciesAccepted, distr_detail = FALSE, key
 
 Carrying out some data wrangling in order to just obtain information on the IUCN redlist status of each of our unique reptile species, of which there are 25. We are then binding this information back onto the comadre data 
 
+Xenosaurus sp was not found in the IUCN database, what does this mean? Because it goes by another name, Zonosaurus sp 
+
 ```{r}
 #This IUCN list contains a lot of information for each species. We just want 
 #their classification and their species name to link to the species
@@ -379,7 +381,6 @@ my_taxa <- comadre_iucn$SpeciesAccepted
 resolved_names <- rotl::tnrs_match_names(names = my_taxa)
 #If the subset you choose is quite big the code should take a bit longer to run but should be fine. 
 
-#The species Hystrix refossa has not been found in the ROTL. This is because the species is an extinct large procupine. All other species passed the quality taxonomic check.
 
 #Inspect the produced table named "resolved_names", which provides taxonomically accepted names, and additional info, such as the unique ott_id that we can then use to obtain phylogenetic tree information from OTL
 resolved_names
@@ -402,17 +403,32 @@ dim(comadre_iucn)
 
 ```
 
+
+
+```{r}
+#Removing the species Zonosaurus sp from comadre_iucn because it is incertae sedis so it has been pruned from the current tree of life as its precise position in the open tree of life is uncertain 
+# Assuming you have the dplyr package installed, if not, install it using install.packages("dplyr")
+library(dplyr)
+
+# Assuming your data frame is named comadre_iucn
+# Remove the 25th row
+comadre_iucn_pruned <- comadre_iucn %>%
+  slice(-25)
+
+
+```
+
 ```{r}
 
-my_taxa <- comadre_iucn$SpeciesAccepted
+my_taxa <- comadre_iucn_pruned$SpeciesAccepted
 #Making a new dataset with the currently accepted name of the species 
 resolved_names <- rotl::tnrs_match_names(names = my_taxa)
-comadre_iucn$OTL_unique_name <- resolved_names$unique_name
+comadre_iucn_pruned$OTL_unique_name <- resolved_names$unique_name
 #Passing on this information to the repository to make sure all these are currently accepted names 
 
 #Adding the names of the species to the data.frame for later merging to the phylogenetic tree with this data.frame
 #Data frame you use needs to have species names as row names 
-row.names(comadre_iucn) <- resolved_names$unique_name
+row.names(comadre_iucn_pruned) <- resolved_names$unique_name
 
 #Obtain the phylogenetic tree for your species
 #Making a tree from the dataset we have made: the open tree of life package: telling the open tree of life we have unique IDs and take the full phylogeny and return to me the phylogeny containing only the hits corresponding to my mammal species 
@@ -436,24 +452,304 @@ my_tree$tip.label <- gsub('_', ' ', my_tree$tip.label)
 
 my_tree$tip.label
 
-#Just to make things more interesting, you'll notice that node number 16 in this tree has a weird name "mrcaottott", which is a mistake we have reported to OTL. This should be Alouatta seniculus, the Colombian red howler. Let's fix it!
-my_tree$tip.label[my_tree$tip.label=="mrcaottott"] <- "Alouatta seniculus"
+#Plotting my new tree
 
-
-plot(my_tree)
+plot(my_tree, cex = 0.8)
 
 #Plot it in radial format
-plot(my_tree, type = "fan")
+
+plot(my_tree, cex = 0.2, type = "fan")
 
 ```
 
+Plotting generation time and population growth rate onto a tree 
+
+```{r}
+#We will be using the R package phytools
+install.packages("phytools")
+library(phytools)
+
+#Download the tree, save it in a folder in the computer, and change the writing directory to the appropriate place in the command below before you read the tree in: This phylogeny has a lot of information on plants and animals in comadre and compadre 
+setwd("/Users/cissi.user.2/Documents/Computer coding/Large datasets assignment")
+tree <- read.tree("COMPADRE-COMADRE_Phylo_June_16_2019.tre")
+
+
+#This tree contains information for most of the species in COMADRE and COMPADRE, and can also be found here https://github.com/jonesor/compadreDB/tree/master/ under the subfolder "Phylogeny" 
+plot(tree)
+
+#Let's clean up the names in the tree, so we can compare them with the names in our object
+tree$tip.label <- gsub("_", " ", tree$tip.label)
+#Getting rid of underscores for plotting 
+
+#Now we need to "prune" the tree, which means to cut out the branches that are not present in our data:
+#The function setdiff: we dont want the whole phylogeny but the part that matches our mammal species. setdiff tells us whih elements in the first vector are not present in the second vector. 
+pruned_tree <- drop.tip(tree, setdiff(tree$tip.label, comadre_iucn_pruned$OTL_unique_name))
+
+#The resulting tree has .. tips, meaning .. species. This is just printing what is in our new pruned tree.
+pruned_tree
+plot(pruned_tree)
+#why have I lost a species, there should be 24 tips? 
+
+```
+```{r}
+
+# Extract tip labels from the tree object
+tree_tip_labels <- tree$tip.label
+
+# Extract tip labels from the comadre_iucn_pruned data frame
+comadre_iucn_pruned_tip_labels <- comadre_iucn_pruned$OTL_unique_name
+
+# Compare the two sets of tip labels
+matching_labels <- intersect(tree_tip_labels, comadre_iucn_pruned_tip_labels)
+
+# Display the matching tip labels
+print(matching_labels)
+
+# Check if there are any tip labels in comadre_iucn_pruned that are not in the tree
+missing_labels <- setdiff(comadre_iucn_pruned_tip_labels, tree_tip_labels)
+print(missing_labels)
+#which is why the tree I plotted only has 23 tips 
+#all the labels in comadre_iucn pruned are not in the tree. why? 
+
+# Check if there are any tip labels in the tree that are not in comadre_iucn_pruned
+extra_labels <- setdiff(tree_tip_labels, comadre_iucn_pruned_tip_labels)
+print(extra_labels)
+```
+```{r}
+
+#So naturally it seems like we are missing some from our object, which are not present in the tree.?
+comadre_iucn_pruned$OTL_unique_name[which(comadre_iucn_pruned$OTL_unique_name%in%pruned_tree$tip.label==F)]
+#Locating all the items that are in one of the datasets and not the other one and outputting this. The function %in%: for every slot in the first vector, are you present in the second vector? Asking if all the species are present in the phylogeny. We want to get rid of the species that aren't present, dont want to plot them in the phylogeny. 
+#So we now have to elimnate "Canis lupus" and "Theropithecus gelada" from our data to proceed with the next steps:
+
+#output is Scleprous mucronatus mucronatus
+#so we have to remove this from the plotting? 
+comadre_iucn_pruned <- comadre_iucn_pruned[-which(comadre_iucn_pruned$OTL_unique_name%in%pruned_tree$tip.label==F),]
+#We are matching the tip labels of the pruned tree to the unique names of the IUCN list: modifying the subset so the order of species matches the order in the phylogeny so we can map the two against eachother? 
+dim(comadre_iucn_pruned)
+
+#Next, we need to reorder the comadre_iucn order so the species appear in the same order in which they appear in the tree
+comadre_iucn_pruned <- comadre_iucn_pruned[match(pruned_tree$tip.label,comadre_iucn_pruned$OTL_unique_name),]
+dim(comadre_iucn_pruned)
+
+#Checking that the order is the same between the object and the tree
+comadre_iucn_pruned$OTL_unique_name
+pruned_tree$tip.label
+#they are in the same order
+
+# Let us now plot the values of population growth rate at the tips of the phylogeny, and reconstruct the ancestral state of the originating lineange
+log_lambdas <- log(setNames(comadre_iucn_pruned$lambda, rownames(comadre_iucn_pruned)))
+#setting names and then log transform: creating an object called log lambdas which has the species name and the value of log lambda 
+
+# create "contMap" object, which allows for the reconstruction of likely ancestral traits
+#my_tree2<-di2multi(pruned.tree)?
+
+#We are now visually plotting the value of log lambda against the phylogeny of mammal species where values in red correspond to high values of population growth rate and values in y are relatively low. Is there a pattern? Same population growth rate across one clade, or no? Should you expect that performance of a population should be the same for all primates or all wild cats or all corals? Should there be phylogenetic grouping for phylogenetic grouping? 
+
+mammal_contMap_lambda <- contMap(pruned_tree, log_lambdas,plot=FALSE,res=200)
+mammal_contMap_lambda <- setMap(mammal_contMap_lambda, c("white","#FFFFB2","#FECC5C","#FD8D3C","#E31A1C"))
+plot(mammal_contMap_lambda, fsize=c(0.7,0.8), leg.txt="log(population growth rate)")
+par(mar=c(5.1,4.1,4.1,2.1)) ## reset margins to default
+
+#Chelonia mydas and Caretta caretta show high population growth rate and they are in the same clade 
+
+#Let's do the same thing for generation time
+log_gen_T <- log(setNames(comadre_iucn_pruned$gen_T, rownames(comadre_iucn_pruned)))
+mammal_contMap_gen_T <- contMap(pruned_tree, log_gen_T,plot=FALSE,res=200)
+mammal_contMap_gent_T <- setMap(mammal_contMap_gen_T, c("white","light blue","blue","violet","purple"))
+plot(mammal_contMap_gent_T, fsize=c(0.7,0.8), leg.txt="log(generation time) (years)")
+
+#You do see grouping here, species that are more closely related have more similar generation times, eg Xenosaurus grandis, Xenosaurus platyceps, Scleroporous arenicolus and Scleroporus grammicus have more similar, shorter generation times, so there is evidence of phylogenetic inertia. Think about a mechanism whereby generation time is phylogenetically conserved! Age of reproduction difference between two groups of individuals it would create reproductive problems. Does this mechanism explain this pattern? yes, speciation would be caused if the age of reproduction of two groups diverged. explaisn why more closely related individulas have similar generatoin times.
 
 
 
+```
+Question 5 
+5. Create a new variable called “Population_performance”. Assign “Decline” or “Increase” to those species whose unique population growth rate is <1 or >1, respectively. This variable is no longer continuous (like population growth rate, lambda was in your original R MarkDown). 
+
+```{r}
+
+# Creating an empty vector to store the values of the new variable
+# Creating an empty vector to store the values of the new variable
+new_variable <- vector()
+
+# Iterating over each row in the data frame
+for (i in 1:nrow(comadre_iucn_pruned)) {
+  # Checking the value of lambda for each species
+  if (comadre_iucn_pruned$lambda[i] > 1) {
+    new_variable <- c(new_variable, 'Increase')
+  } else if (comadre_iucn_pruned$lambda[i] < 1) {
+    new_variable <- c(new_variable, 'Decline')
+  }
+}
+
+#need to explain what this for loop is doing 
+
+# Adding the new variable to the data frame
+comadre_iucn_pruned$Population_performance <- new_variable
+
+# Displaying the updated data frame
+print(comadre_iucn_pruned)
+dim(comadre_iucn_pruned)
+head(comadre_iucn_pruned)
+```
+Explore in this handy website (http://blog.phytools.org) a way to plot that new trait on your phylogenetic tree. Then add another column to the phylogeny in such a way that you show the conservation status of those species (collected in previous steps from the IUCN). See picture below for reference/inspiration
+
+Plotting pop_growth_rate onto my phylogenetic tree 
 
 
 
+Applying the ACE (Ancestral Character Estimation) function to estimate the ancestral states of the discrete variable: (being above or below the median diversification rate) defined by my split column. This makes diversification rate a binary character: 
 
+```{r}
+recon <- ace(comadre_iucn_pruned$Population_performance, pruned_tree, type = "discrete")
+#Viewing the likelihood of the ancestral states for all the nodes in the tree
+recon
+#You can see the likelihood of ancestral states for all nodes by extracting this part of the ace() output
+recon$lik.anc
+
+```
+Plotting how diversification rates change over the course of the tree
+
+```{r}
+plot(pruned_tree, type = "phylogram", show.tip.label = FALSE)
+cols <- c(Increase = "blue", Decline = "yellow") # Define colors for categories
+tiplabels(pch = 22, cols[comadre_iucn_pruned$Population_performance], cex = 2)
+nodelabels(thermo = recon$lik.anc, piecol = cols, cex = 0.75)
+axisPhylo()
+
+```
+Modifying this code: 
+
+```{r}
+library(ape)
+
+# Assuming pruned_tree is your phylogenetic tree object
+# Assuming recon is your reconstruction object
+# Assuming comadre_iucn_pruned$Population_performance contains categorical values ('Increase' or 'Decline')
+
+# Plotting the phylogram
+plot(pruned_tree, type = "phylogram", show.tip.label = FALSE)
+
+# Define colors for categories
+cols <- c(Increase = "blue", Decline = "yellow")
+
+# Plot tip labels
+tiplabels(pch = 22, col = cols[comadre_iucn_pruned$Population_performance], cex = 2, adj = 0)
+
+# Plot node labels
+nodelabels(thermo = recon$lik.anc, piecol = cols, cex = 0.75)
+
+# Add axis
+axisPhylo()
+
+
+```
+
+```{r}
+# Assuming pruned_tree is your phylogenetic tree object
+# Assuming recon is your reconstruction object
+# Assuming comadre_iucn_pruned$Population_performance contains categorical values ('Increase' or 'Decline')
+
+# Plotting the phylogenetic tree with tip labels
+plot(pruned_tree, show.tip.label = TRUE)
+
+# Define colors for categories
+cols <- c(Increase = "blue", Decline = "yellow")
+
+# Plot tip labels with colors
+tiplabels(pch = 22, col = cols[comadre_iucn_pruned$Population_performance], cex = 2, adj = 0)
+
+# Plot node labels
+nodelabels(thermo = recon$lik.anc, piecol = cols, cex = 0.75)
+
+# Add axis
+axisPhylo()
+
+
+
+```
+Getting rid of the nodes key?
+
+```{r}
+
+# Assuming you have already loaded the ggphylo package
+install.packages("ggphylo")
+library(ggphylo)
+
+# Your existing code
+plot(pruned_tree, type = "phylogram", label.offset = 0.5)
+cols <- c("blue", "yellow")
+tiplabels(pch = 22, bg = cols[comadre_iucn$PopulationPerformance], cex = 2)
+
+# Remove internal node labels
+tree_without_labels <- tree.remove.node.labels(pruned_tree)
+
+# Plot the modified tree
+plot(tree_without_labels, type = "phylogram", label.offset = 0.5)
+axisPhylo()
+```
+
+
+```{r}
+head(comadre_iucn_pruned)
+```
+
+```{r}
+library(dplyr)
+
+comadre_iucn_prunedfortree <- comadre_iucn_pruned %>%
+  mutate(IUCNstatus = case_when(
+    IUCNstatus == "Endangered" ~ "EN",
+    IUCNstatus == "Vulnerable" ~ "VU",
+    IUCNstatus == "Near Threatened" ~ "NT",
+    IUCNstatus == "Least Concern" ~ "LC",
+    IUCNstatus == "Not Assessed" ~ "NA",
+    TRUE ~ IUCNstatus  # Keep unchanged if not matched
+  ))
+
+head(comadre_iucn_prunedfortree)
+
+
+```
+Plotting IUCN status onto my tree 
+
+```{r}
+recon2 <- ace(comadre_iucn_pruned$IUCNstatus, pruned_tree, type = "discrete")
+#Viewing the likelihood of the ancestral states for all the nodes in the tree
+recon2
+#You can see the likelihood of ancestral states for all nodes by extracting this part of the ace() output
+recon2$lik.anc
+
+
+```
+```{r}
+# Assuming pruned_tree is your phylogenetic tree object
+# Assuming recon is your reconstruction object
+# Assuming comadre_iucn_pruned$Population_performance contains categorical values ('Increase' or 'Decline')
+# Assuming comadre_iucn_pruned$IUCNstatus contains categorical values ('EN', 'VU', 'NT', 'LC', 'NA')
+
+# Plotting the phylogenetic tree with tip labels
+plot(pruned_tree, show.tip.label = TRUE)
+
+# Define colors for categories
+cols <- c(Increase = "blue", Decline = "yellow")
+cols_iucn <- c("EN" = "red", "VU" = "orange", "NT" = "green", "LC" = "blue", "NA" = "gray")  # Define colors for IUCN status
+
+# Plot tip labels with colors for Population_performance
+tiplabels(pch = 22, col = cols[comadre_iucn_pruned$Population_performance], cex = 2, adj = 0)
+
+# Plot tip labels with colors for IUCNstatus
+tiplabels(pch = 22, col = cols_iucn[comadre_iucn_pruned$IUCNstatus], cex = 2, adj = 1)
+
+# Plot node labels for Population_performance
+nodelabels(thermo = recon$lik.anc, piecol = cols, cex = 0.75)
+
+# Add additional labels for IUCNstatus
+text(x = par("usr")[1] + 0.1, y = par("usr")[3] + 0.1, labels = comadre_iucn_pruned$IUCNstatus, col = cols_iucn[comadre_iucn_pruned$IUCNstatus], cex = 0.5, adj = 0)
+
+# Add axis
+axisPhylo()
 
 
 
