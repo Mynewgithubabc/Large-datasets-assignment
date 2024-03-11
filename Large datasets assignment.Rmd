@@ -28,66 +28,124 @@ plot(pressure)
 
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
 
-```{r}
+```{r, echo = FALSE}
 #Clear the R environment: if anything from a previous session is here it clears the objects that were made before. 
 rm(list = ls())
 
 ```
 
-```{r}
+```{r, echo = FALSE} 
+#installing and loading the required packages
+
+# Check if Rcompadre package is installed
+if (!requireNamespace("Rcompadre", quietly = TRUE)) {
+  # If not installed, install it
+  install.packages("Rcompadre")
+}
+
+# Check if tidyverse package is installed
+if (!requireNamespace("tidyverse", quietly = TRUE)) {
+  # If not installed, install it
+  install.packages("tidyverse")
+}
+
+if (!requireNamespace("popbio", quietly = TRUE)) {
+  # If not installed, install it
+  install.packages("popbio")
+}
+
+if (!requireNamespace("Rage", quietly = TRUE)) {
+  # If not installed, install it
+  install.packages("Rage")
+}
+
+if (!requireNamespace("ggplot2", quietly = TRUE)) {
+  # If not installed, install it
+  install.packages("ggplot2")
+}
+
+if (!requireNamespace("taxsizw", quietly = TRUE)) {
+  # If not installed, install it
+  install.packages("taxsizw")
+}
+
+if (!requireNamespace("dplyr", quietly = TRUE)) {
+  # If not installed, install it
+  install.packages("dplyr")
+}
+
+if (!requireNamespace("phytools", quietly = TRUE)) {
+  # If not installed, install it
+  install.packages("phytools")
+}
 
 
-#Install the package Rcompadre, which will allow you to access COMADRE (and COMPADRE) online
-#install.packages("Rcompadre")
-#install.packages("tidyverse) # this is for data wrangling
 
-#Call the library so you can start using it:
+
+
+
+# Load the libraries
 library(Rcompadre)
 library(tidyverse)
+library("popbio")
+library("Rage")
+library(ggplot2)
+library(taxize)
+library(dplyr)
+library(phytools)
+
+
+
+
+
+
+```
+
+
+
+```{r, echo = FALSE}
+
 
 #Fetch the most recent database version from www.compadre-db.org with:
 comadre <- cdb_fetch("comadre") 
-#This function takes comadre from the webiste: there are two data bases it deals with: comadre vs compadre: we are telling it to fetch comadre, which is for mammals (not plants)
+#This function takes comadre from the website www.comadre-db.org. This website has two databases, comadre for animals and compadre for plants. I am telling it to fetch comadre, 
 
-#The command 'dim' outputs the dimensions of an object, thus giving you an idea of how many row entries and column variables there are in the original database: tells you the dimensions of the database: 
+#The command 'dim' tells me the dimension of the database comadre
 dim(comadre)
 
 
 ```
 
-Exploring the metadata in comadre. Metadata is the extra bits of information surrounding your data. Eg if your data is heights of different trees, metadata is location and species data 
 
-```{r}
-#Explore the metadata in COMADRE
+```{r, echo = FALSE}
+#Exploring the metadata in COMADRE. Metadata is 'extra' information surrounding my data.
 comadre@data
-#Choosing the taxonomic subset of animals, reptiles. 
 
-```
-```{r}
-
-#Examining all the possible classes in the dataset I could choose from 
+#Examining all the possible classes in the dataset
 unique_classes <- unique(comadre@data$Class)
 # Print the unique classes
 print(unique_classes)
 
-#Finding the number of unique species in the class Reptilia ?
 ```
 
 
 ```{r}
-#subsetting our data to only include reptiles, and to only include wild individuals, not captive individuals, and species that are not constrained geographically 
+##In order to establish relationships between generation time and conservation status, we need to ensure that statistical inferences only concern these and no otehr confounding variables. We therefore subset the data to allow us to draw fair comparisons.
+#subsetting my data to only include reptiles, and to only include wild individuals, not captive individuals. The species will also not be constrained geographically. 
 comadre1 <- subset(comadre,
                    # Consider only reptiles
                    Class == "Reptilia" & 
-                 
-                  # studied under "control" (i.e. no treatment) conditions
+                  #studied under "control" (i.e. no treatment) conditions
                    MatrixTreatment == "Unmanipulated" &
-                   # and only from "W"ild populations
+                   #only from "W"ild populations
                    MatrixCaptivity == "W")     
 
-#taking a subset of the whole dataset to make a smaller dataset to make a subset of only the species we are interested in. The criterium being imposed are: just reptiles, with no geographical constraint. Matrix treatement (find out more and go to the URL to find in detail description): dynamics of huge populations under natural conditions. Establishing relationships between generation time and conservation studies we need to ensure that statistical inferences are to do with these and nothing else. We subset the data to allow us to draw fair comparisons? The last criterium is on whether they are from wild populations or not.
+#taking a subset of the whole dataset to make a smaller dataset to make a subset of only the species we are interested in. The criterium being imposed are:
+#just reptiles, with no geographical constraint.
+#Matrix treatement unmanipulated, ie representing the dynamics of huge populations under natural conditions.
+# The last criterium states that they are only from wild populations. 
 
-#ensuring that there are at least 10 unique species in this subset 
+#ensuring that there are at least 10 unique species in this subset:
 
 #Examining all the possible classes in the dataset I could choose from 
 unique_species_reptilia <- unique(comadre1$Species)
@@ -98,11 +156,16 @@ length(unique_species_reptilia)
 #calculating the dimensions of my new subsetted comadre1: 
 dim(comadre1)
 
+
 ```
 
-We will use the function cdb_flag() to add columns to the database flagging potential issues with these MPMs, such as missing values, or MPMs that don’t meet assumptions necessary to calculate population growth rates (like ergodicity, irreducibility, or primitivity 
 
-```{r}
+
+```{r echo = FALSE}
+
+#We will use the function cdb_flag() to add columns to the database which flag potential issues with these MPMs. This could include missing values, or MPMs that don’t meet assumptions necessary to calculate population growth rates.
+
+
 #we cannot calculate population growth rate from any data that has NAs attached or is not ergodic. 
 #ergodic means that there is statistical equivalence between mean values measured over time and mean values measured across space 
 
@@ -118,102 +181,70 @@ head(comadre_sub)
 
 ```
 
-Three fundamental factors impacting populations are: 
-Reproduciton 
-Survival 
-Growth / development. 
-These are things any species needs to do to fulfil its rule to pass on its genes and survive, reproduce and close the loop. 
-Reproduction comes in different flavours: sexual vs asexual reproduction (clonality). Survival and growth: parts of the same coin. Growth depends on survival, you cant grow tomorrow if you die today. some species have the ability to decrease in size so shrinkage and growth are part of the same thing. Any population matrix is a three dimensinal layer / cake. 
+
+
+
+
+
+QUESTION 1:
+
+
 
 ```{r}
-#Explore some MPMs in your subset database
-#The first MPM stored in your data is:
-matA(comadre_sub)[[1]] #the subset contains many MPMs, this is just one of them 
-#Extracts a full matrix population model from a subset of comadre: this is the three layered pancake. We need to know which numbers correspond to which layer. 
-#The value that is 76 is reproduction as it cannot be survival because the value is more than 1 whereas survival should be bounded between 0 and 1 
+#I am going to obtain population growth rates using the function "lambda" from the R package "popbio
+#Using the function lapply (which applies a function to every element in a list), I will calculate the population growth rate (lambda) for each matrix.
 
-#We are now going to add the submatrices U, F and C: 
-matU(comadre_sub)[[1]] #This is the survival component of the matrix, values are between 0 and 1 
-matF(comadre_sub)[[1]] #the sexual component of the matrix population model 
-matC(comadre_sub)[[1]] #the clonal component of the matrix population model, makes sense that it is all 0s  
 
-comadre_sub@data[1,] #This line shows one portion of the matrix, the first row
-```
-the population growth rate ($\lambda$) corresponds to the dominant eigenvalue of the MPM *A*, and it projects the rate of growth (if $\lambda$ > 1) or decline ($\lambda$ < 1) of the population. One of the three definitions of generation time (T) is the mean age of reproductive individuals in the population. This life history trait is tightly linked to the rate of population turnover, and it is frequently used in assessments of vulnerability of the IUCN.
-
-1: Show a histogram of population growth rate and a separate histogram of generation time of my subset. 
-
-Generating a histogram for population growth rate 
-
-```{r}
-#Obtain population growth rates using the function 
-#"lambda" from the R package "popbio
-#install.packages("popbio") (need an if loop in the code to install this if it has not yet been installed.)
-library("popbio")
-
-#Using lapply (which applies a function to every element in a list), 
-#we will calculate the population growth rate (lambda) for each matrix
-#looking at the subset: from our subset we call matA and apply the lambda function to it which extracts the growth rate 
 comadre_sub$lambda <- unlist(lapply(matA(comadre_sub), popbio::lambda))
+#from my subset that I have made from comadre I will call the MPM matA (the rate of growth of the pouplation) and apply the lambda function to it which will extract the growth rate. 
 
-#Examine the distribution of population growth rates:
+#Examining the distribution of population growth rates:
 hist(comadre_sub$lambda, xlab= "Population growth rate", main = "Frequency distribution of Population growth rates")
 abline(v = 1, col = 'red', lty = 2, lwd = 2) #this histogram shows the frequency distribution of population growth rates
-#This line of code adds a verticle line at x = 1. If population growth rate = 1 this means the population is not changing in size and is at demographic equilibrium. If the conditions under which the matrix was parameterized dont change the population will remain stable 
+#This line of code adds a verticle line at x = 1. 
+
 #Populations change over time so if you want to consider a population over time the value of lambda changes, for example this might come from an abnormally good year. if you assume as many resources and that density dependence isnt important (hasnt reached carrying capacity) lambda would be higher than one. So unless you calculate lambda through a lot of matrix following populations over a long time this is problematic. 
 
 
-#hist(comadre_sub$MatrixID) #this is a historgram showing the distribution of the matrices? 
+
 
 
 ```
-The (mean?) frequency distributoin of the population centers around 1. This makes sense because this means the population is not changing in size and is at demographic equilibrium.
-
+The frequency distribution  of population growth rate centers around the value of 1. Most of the populations are not changing in size and are at demographic equilibrium. This is expected. If the conditions under which the matrix was parameterized do not change the population will remain stable. Density dependence causes population growth rates to tend to 1 since increasing beyond this value causes populations to exhaust their finite resources so population size decreases. There are some cases of larger population growth rate shown by the right skew of the distribution.  These may be outliers and may be recovering from a perturbation. 
 
 Generating a histogram for distributions of generation time: 
 
 ```{r}
 #To calculate generation time, we will use the R package "Rage"
-#install.packages("Rage")
-library("Rage")
 
-#Again using lapply, we will now use the U and F matrices 
+#Again using the function lapply, we will now use the matrices U and F to find information about generation time 
 #to calculate the generation time
 comadre_sub$gen_T <- mapply(Rage::gen_time, matU(comadre_sub), matF(comadre_sub))
+#In order to calculate generation time we must split the overall MPM up into sub matrices. We  require the sub matrix U (survival and growth) and F which includes sexual reproduction.
 
-#To calculate population growth rate you can claculate this with matrix A. But to calculate generation time you need to separate the processes. So instead of feeding MAT A we need the sub matrix U, survival and growth, and F which includes sexual reproduction. Splitting the matrix up. 
+#Examining the distribution of generation times where generation time refers to the number of years from birth to reproduction.
 
-#In the code above, the accessor function matA() is used to extract a list 
-#of projection matrices (the full matrix, matA) from every row of comadre_sub. 
-#There are also accessor functions for the matrix subcomponents (matU(), 
-#matF(), matC()), and for many other parts of the database too.
-
-#Examine the distribution of generation times:
-#Generation time is the number of years from birth to reproduction. There are actually three definitions but the most accapted is this. Or can think of as the mean age at which individuals reproduce.
-
-#Why do we care? Important: populations with shorter generation times can respond faster/ evolve faster in response to stress. Species with shorter generation times evolve faster. If you have information about generation times, can you come up with a hypothesis linking conservation status and generation time? 
-#We can hypothesize that those with better conservation status have shorter generation times, less endangered.
 
 hist(comadre_sub$gen_T, xlab = "Generation time (years)", main = "Frequency distribution of generation times")
 #there is a higher frequency of populations with shorter generation times 
 
 ```
-There is a higher frequency of populations with shorter generation times. This makes sense because they can evolve faster in response to stress so are less likely to be endangered (we can hypothesize this)
+
+There is a higher frequency of populations with shorter generation times, especially between 0- 10 years. This is expected as populations with shorter generation times respond faster to environmental stress and evolve faster, and are therefore a positively selected feature. The distribution is right skewed as some reptiles have very long lifespans. 
 
 
-2. Fit a model to explore whether the generation time and population growth rate of your species’ populations are correlated. Would you have expected them to be correlated? Why?
+QUESTION 2: Exploring whether there is a correlation between population growth rate and generation time: 
 
-Attempt for question 2: 
 
-```{r}
+
+```{r, echo = FALSE}
 #The data about population growth rate is: 
 comadre_sub$lambda
 #The data about generation time is: 
 comadre_sub$gen_T
 
 
-
-#Checking if there are NAs in lambda values and removing these. Asking out of all the lamdas are there some that are nas? This is a conditional line that gets rid of nas that in this case isn't fulfilled as there isnt nas in this dataset. If you rerun this in another dataset that has nas it would work.
+#The following code checks if there are NAs in lambda values and removes them. This is a conditional if loop that gets rid of nas that in this case isn't fulfilled as there are not any NAs in this dataset.
 if (length(which(is.na(comadre_sub$lambda)))>0) {
   comadre_sub <- comadre_sub[-which(is.na(comadre_sub$lambda)),]
 }
@@ -229,70 +260,76 @@ if (length(which(is.infinite(comadre_sub$gen_T)))>0) {
 
 ```
 
+
 ```{r}
-#What kind of model do I want to use? 
-#A linear regression analysis 
 
-# Fit a linear regression model
-linear_model <- lm(comadre_sub$lambda ~ comadre_sub$gen_T)
 
-# Summarize the model
-summary(linear_model)
+#Creating a scatter plot of generation time against population growth rate 
+ggplot(comadre_sub, aes(x = gen_T, y = lambda)) +
+  geom_point() +  # Add points for each data point
+  labs(x = "Generation Time", y = "Population Growth Rate") +  # Label axes
+  ggtitle("Scatter Plot of Generation Time vs Population Growth Rate")  
+
+
+# Extracting the variables
+population_growth_rate <- comadre_sub$lambda
+generation_time <- comadre_sub$gen_T
+
+# Running correlation test
+correlation_test_result <- cor.test(generation_time, population_growth_rate)
+
+# Print the correlation test result
+print(correlation_test_result)
+
 
 ```
-The p value is > 0.05 so there is no statistically significant linear correlation between between generation time and population growth rate.
+The p value for my pearson’s correlation test is 0.2615. This value is greater than 0.05 therefore there is no statistically significant correlation between population growth rate and generation time. This is not expected. We would expect a correlation as shorter generation times should cause populations to increase faster since organisms with shorter generation times produce more offspring per unit of time. 
+More correlation might have been expected if there was more variation seen in the population growth rates. However since population growth rate tends around 1, no correlation with generation time can be observed. 
 
-EXPLAIN WHY YOU WOULD HAVE EXPECTED TO SEE A CORRELATION 
+QUESTION 3: 
 
 
-3: 
-Obtaining conservation status of these species from the IUCN Red list. Then explore, using statistical methods whether generation time and population growth rate predict conservation status 
+```{r, message=FALSE, error=FALSE, warning=FALSE, echo = FALSE}
+#Note that the object 'comadre_sub' contains multiple MPMs for each species. Sometimes these MPMs correspond to different years within the same population, or they may refer to different populations, or come from different publications or research groups. We will only sample one MPM per species:
 
-Note that the object 'comadre_sub' contains quite a few MPMs for each species. Sometimes these MPMs correspond to different years (e.g., 2000 to 2001, 2001, to 2002...) within the same population, and sometimes they may refer to different populations, or even come from different publications/research groups. As such, for the purposes of today's exercise, and in the interest of time, we will only sample one MPM per species:
-```{r, message=FALSE, error=FALSE, warning=FALSE}
-#Identifying which species names are unique:
-unique_comadre <- unique(comadre_sub$SpeciesAccepted)
-#If there are multiple treatments on a species there is more than one matrix
-length(unique_comadre)
-#Resulting in 25 reptile species 
-
-#We could sample a single MPM wihtin each species in different ways, but here we are going to simply selecting the first entry in the whole of comadre_sub where there is a new species using the command 'duplicated'. This function examines element by element in a vector whether the next element has already appeared before in the vector.
-comadre_sub <- comadre_sub[which(duplicated(comadre_sub$SpeciesAccepted)==FALSE),] #after executing this line of code, comadre_sub will only contain unique rows based on the values in the column 'SpeciesAccepted', so each MPM only represents one species 
+#In the following line of code I will select the first entry of the whole of comadre_sub where ther is a new species using the command 'duplicated' thish examines element by element in a vector to find out whether the next element has already appeared before in the vector.
+comadre_sub <- comadre_sub[which(duplicated(comadre_sub$SpeciesAccepted)==FALSE),] # comadre_sub now only contains unique rows based on the values in the column 'SpeciesAccepted', so each MPM only represents one species 
 dim(comadre_sub)
 
 
 
 ```
-Accessing the IUCN data:
-```{r}
-#Install and call the R package 
-#install.packages("taxize")
-library(taxize)
-#https:/apiv3.iucnredlist.org', provide IUCN access.  ?
+
+```{r, echo = FALSE}
+#Accessing the IUCN data
+#https:/apiv3.iucnredlist.org'.
 
 API_token <- "8d9c556bb4aa2efeacdc49775c0d0514b42139c96d5ed0f6b9ca5a495ffa49a4"
 #Using the API token to extract information from IUCN 
-#run the summary from IUCN for our species names
+
 IUCN.list <- iucn_summary(comadre_sub$SpeciesAccepted, distr_detail = FALSE, key = API_token)
+#runs a summary of data extracted from the IUCN for my species names. 
 
 ```
 
 
-Carrying out some data wrangling in order to just obtain information on the IUCN redlist status of each of our unique reptile species, of which there are 25. We are then binding this information back onto the comadre data 
 
-Xenosaurus sp was not found in the IUCN database, what does this mean? Because it goes by another name, Zonosaurus sp 
 
-```{r}
-#This IUCN list contains a lot of information for each species. We just want 
-#their classification and their species name to link to the species
-library(tidyverse)
+```{r, echo = FALSE}
 
-IUCN_data <- lapply(IUCN.list, function(x){
-  return(tibble(IUCNstatus = x$status))}) %>% 
-  bind_rows() %>% 
-  mutate(SpeciesAccepted = comadre_sub$SpeciesAccepted)
+#The following code is data wrangling which ensures I only obtain information about IUCN redlist status for each of my unique reptile species (of which there are 25) and nothing else. I am then binding this information back onto the comadre data that I generated above. 
+#This IUCN list contains a lot of information for each species. I am only obtaining information about their classification and species name. 
 
-#Now link back to original data using the left_join() function
+#the following code takes the IUCN.list, extracts status information from each element, combines them into a single tibble and then adds a new column SpeciesAccepted to this tibble with values from comadre_sub$SpeciesAccepted. 
+
+IUCN_data <- lapply(IUCN.list, function(x){ #iterates over each element x in the IUCN list. 
+  return(tibble(IUCNstatus = x$status))}) %>% #For each element it creates a data frame with a single column named IUCN status containing the status information extracted from the status field of the element x. 
+  bind_rows() %>%  #Uses the dplyr package to pipe the list of tibbles obtained from the lapply() function into the bind_rows function. Binds all the tibbles together row wise, essentially combining them into a single tibble. 
+  mutate(SpeciesAccepted = comadre_sub$SpeciesAccepted) #creates a new column called SpeciesAccepted and assigns the values of comadre_sub$SpeciesAccepted to it, adding a new column to the combined tibble 
+
+
+
+#Now linking this back to original data using the left_join() function
 comadre_iucn <- comadre_sub %>%
   left_join(x = ., y = IUCN_data, by = "SpeciesAccepted") %>% 
   mutate(IUCNstatus = case_when(
@@ -305,7 +342,9 @@ comadre_iucn <- comadre_sub %>%
                         levels = c("Endangered","Vulnerable",
                                    "Near Threatened","Least Concern",
                                    "Not Assessed")))
-#whenever it is vulnerable, writing it as Vu, etc. 
+#whenever it is vulnerable, writing it as Vu, etc.
+
+#linking data from IUCN_data back to the original comadre_sub based on SpeciesAccepted column, then transforming the IUCNstatus column to a factor and assigning specific lvels based on the orignal status values. 
 dim(comadre_iucn)
 
 #We are going to flatten out this object into a simple data.frame
@@ -321,14 +360,14 @@ comadre_iucn$iucn_colour[which(comadre_iucn$IUCNstatus == "Least Concern")] <- "
 comadre_iucn$iucn_colour[which(comadre_iucn$IUCNstatus == "Not Assessed")] <- "Blue"
 
 head(comadre_iucn)
-
+dim(comadre_iucn)
 
 ```
 
-Now explore both visually and statistically the relationships between generation time, on the one hand, and population growth rate, on the other hand. 
 
 
 
+Exploring visually and statistically whether generation time and population growth rate predict conservation status:
 ```{r}
 #Exploring the relationship between generation time and population growth rate 
 ggplot(comadre_iucn, aes(x = IUCNstatus, y = gen_T, 
@@ -338,7 +377,7 @@ ggplot(comadre_iucn, aes(x = IUCNstatus, y = gen_T,
   scale_fill_viridis_d(option = "B", begin = 0.3, end = 0.8) +
   labs(x = "IUCN redlist status", y = "Generation time (years)") +
   theme_classic(base_size = 14)
-#Created a boxplot of generation time against IUCN status. We made a hypothesis on how generation time is related to conservation studies. We predicted that species of shorter generation times should be less likely to be endangered. 
+#Created a boxplot of generation time against IUCN status.  
 
 ANOVA_gen_T <- aov(gen_T~IUCNstatus, data = comadre_iucn)
 summary(ANOVA_gen_T)
@@ -358,44 +397,26 @@ summary(ANOVA_lambda)
 #P is also > 0.05 so the relationship is not significant 
 
 ```
-None of the relationships are statistically significant. Why?? 
 
-Question 4: 
-Plotting the values of generation time and population growth rate of your species on the phylogeny provided to you. Is there any visual evidence of phylogenetic inertia in those traits? Why? 
-
-(phylogenetic inertia refers to the limitations on future evolutionary pathways that have been imposed by previous adaptations)
-
-The first step is to run a taxonomic check on your species names, in case these are not taxonomically accepted ("up to date" according the latest biological evidence regarding species relationships)
+The p value of my ANOVA of generation time and conservation status is 0.398. This is greater than 0.05 so generation time does not significantly predict conservation status. The P value for my ANOVA of population growth rate and conservation status is 0.249. This is greater than 0.05 so it is not significant.  Generation time and population growth cannot be used to predict conservation status. This is somewhat expected as the data concerns wild populations so many other factors may be more important in predicting conservation status. A correlation may be expected in captivity, since populations with a lambda value close to 1 are at demographic equilibrium and ought to be stable and not endangered. Populations with shorter generation times respond faster to environmental stress thus might be expected not to be endangered. 
 
 
+QUESTION 4: 
+```{r, echo = FALSE}
 
-```{r}
-
-
-
-#Once again, state your species names
 my_taxa <- comadre_iucn$SpeciesAccepted
-#We are checking whether the species are taxonomically accepted 
+#We are checking whether the species names are taxonomic ally accepted 
 
-#Use the command 'tnrs_match_names' to run my_taxa through the API of ROTL to check species names
+
 resolved_names <- rotl::tnrs_match_names(names = my_taxa)
-#If the subset you choose is quite big the code should take a bit longer to run but should be fine. 
-
-
-#Inspect the produced table named "resolved_names", which provides taxonomically accepted names, and additional info, such as the unique ott_id that we can then use to obtain phylogenetic tree information from OTL
+#Using the command 'tnrs_match_names' to run my_taxa through the API of ROTL to check species names
 resolved_names
-#approximate match means: it is true if it finds suggestions of names you might want to consider as an alternative but in this case it is all fine. 
+#Inspecting the produced table called resolved_names which provides taxonomically and additional information such as unique ott_id which I will later use to obtain phylogenetic tree information from the open tree of life (OTL)
 #OTT ID is the unique number given to any species across the tree of life. 
-#We need to eliminate any species whose ott_id is NA to proceed with the following steps and then re-do the previous steps:
-#the approximate match is also flagged 'incertae sedis' which means its precise location in the tree of life is uncertain / disputed. there is insufficient data to confidently place a taxon within a specific clade. 
 
-#it has therefore been pruned from the latest tree in the open tree of life. I am therefore going to prune it from my data. 
 
-```
-
-```{r}
 comadre_iucn$ott_id <- resolved_names$ott_id
-#Within this there is a variable called ott_id which we are interested, we are creating a variable called this and saving this information in our data frame 
+#Within resolved _names, there is a variable called ott_id which we are interested, we are adding this variable to our data frame
 dim(comadre_iucn)
 comadre_iucn <- comadre_iucn[is.na(comadre_iucn$ott_id) == FALSE,]
 #Getting rid of any NAs 
@@ -403,51 +424,44 @@ dim(comadre_iucn)
 
 ```
 
-
-
 ```{r}
-#Removing the species Zonosaurus sp from comadre_iucn because it is incertae sedis so it has been pruned from the current tree of life as its precise position in the open tree of life is uncertain 
-# Assuming you have the dplyr package installed, if not, install it using install.packages("dplyr")
-library(dplyr)
 
-# Assuming your data frame is named comadre_iucn
-# Remove the 25th row
-comadre_iucn_pruned <- comadre_iucn %>%
+
+#Removing the species Zonosaurus sp from comadre_iucn because it is incertae sedis so it has been pruned from the current tree of life as its precise position in the open tree of life is uncertain 
+
+# Remove the 24th row
+comadre_iucn <- comadre_iucn %>%
   slice(-25)
 
+dim(comadre_iucn)
 
 ```
 
-```{r}
 
-my_taxa <- comadre_iucn_pruned$SpeciesAccepted
-#Making a new dataset with the currently accepted name of the species 
+```{r}
+my_taxa <- comadre_iucn$SpeciesAccepted
+#Making a new dataset with the currently accepted names of the species 
 resolved_names <- rotl::tnrs_match_names(names = my_taxa)
-comadre_iucn_pruned$OTL_unique_name <- resolved_names$unique_name
+#using the function tnrs_match_names() function from the rotl package to query the taxonomic resolution service, TNRS using the taxonomic names stored in my_taxa and storing results in resolved_names
+comadre_iucn$OTL_unique_name <- resolved_names$unique_name
 #Passing on this information to the repository to make sure all these are currently accepted names 
 
 #Adding the names of the species to the data.frame for later merging to the phylogenetic tree with this data.frame
 #Data frame you use needs to have species names as row names 
-row.names(comadre_iucn_pruned) <- resolved_names$unique_name
-
-#Obtain the phylogenetic tree for your species
-#Making a tree from the dataset we have made: the open tree of life package: telling the open tree of life we have unique IDs and take the full phylogeny and return to me the phylogeny containing only the hits corresponding to my mammal species 
-my_tree <- rotl::tol_induced_subtree(resolved_names$ott_id)
-
-#the OTL unique name and the species name for OTU 3091 don't match up: the species name is zonosaurus sp but the name we originally searched for was xenosaurus sp.
+row.names(comadre_iucn) <- resolved_names$unique_name
 
 ```
 
 ```{r}
 
-#Plot the tree:
-plot(my_tree)
+#Obtain the phylogenetic tree for your species
+my_tree <- rotl::tol_induced_subtree(resolved_names$ott_id)
+#making a phylogenetic tree from my dataset resolved_names by communicating our OTT IDs to the OTL and returning only the phylogeny containing hits corresponding to my reptile species. 
 
-#Delete the ott ids for easier plotting:to make it less information dense 
+#Delete the ott ids 
 my_tree$tip.label <- gsub('_ott', '', my_tree$tip.label)
-#substituting _ott with nothing, ie deleting it. 
 my_tree$tip.label <- gsub('[0-9]+', '', my_tree$tip.label)
-#substituting any numeric combination between 0 and 9 and all numbers in between with nothing ie deleting all the numbers 
+#deleting numbers from tip labels 
 my_tree$tip.label <- gsub('_', ' ', my_tree$tip.label)
 
 my_tree$tip.label
@@ -456,95 +470,85 @@ my_tree$tip.label
 
 plot(my_tree, cex = 0.8)
 
-#Plot it in radial format
 
-plot(my_tree, cex = 0.2, type = "fan")
 
 ```
 
 Plotting generation time and population growth rate onto a tree 
 
-```{r}
+```{r, echo = FALSE}
 #We will be using the R package phytools
-install.packages("phytools")
-library(phytools)
 
-#Download the tree, save it in a folder in the computer, and change the writing directory to the appropriate place in the command below before you read the tree in: This phylogeny has a lot of information on plants and animals in comadre and compadre 
+
 setwd("/Users/cissi.user.2/Documents/Computer coding/Large datasets assignment")
 tree <- read.tree("COMPADRE-COMADRE_Phylo_June_16_2019.tre")
+#I am downloading the tree of life and changing my working directory to the appropriate locaiton, and then reading the tree into my R. The tree contains lots of information about plants and animals in comadre and compadre. 
+
+plot(tree) #plotting this tree 
 
 
-#This tree contains information for most of the species in COMADRE and COMPADRE, and can also be found here https://github.com/jonesor/compadreDB/tree/master/ under the subfolder "Phylogeny" 
-plot(tree)
+tree$tip.label <- gsub("_", " ", tree$tip.label) #cleaning the names in the tree so they can be compared with the names in our object, by removing underscores for plotting
 
-#Let's clean up the names in the tree, so we can compare them with the names in our object
-tree$tip.label <- gsub("_", " ", tree$tip.label)
-#Getting rid of underscores for plotting 
+pruned_tree <- drop.tip(tree, setdiff(tree$tip.label, comadre_iucn$OTL_unique_name)) #pruning the tree to cut out the branches not present in my dataset using the setdiff function which informs us which elements in the first vector are not present in the second vector. 
 
-#Now we need to "prune" the tree, which means to cut out the branches that are not present in our data:
-#The function setdiff: we dont want the whole phylogeny but the part that matches our mammal species. setdiff tells us whih elements in the first vector are not present in the second vector. 
-pruned_tree <- drop.tip(tree, setdiff(tree$tip.label, comadre_iucn_pruned$OTL_unique_name))
-
-#The resulting tree has .. tips, meaning .. species. This is just printing what is in our new pruned tree.
 pruned_tree
 plot(pruned_tree)
-#why have I lost a species, there should be 24 tips? 
+
 
 ```
-```{r}
+
+```{r, echo = FALSE}
 
 # Extract tip labels from the tree object
 tree_tip_labels <- tree$tip.label
 
 # Extract tip labels from the comadre_iucn_pruned data frame
-comadre_iucn_pruned_tip_labels <- comadre_iucn_pruned$OTL_unique_name
+comadre_iucn_tip_labels <- comadre_iucn$OTL_unique_name
 
 # Compare the two sets of tip labels
-matching_labels <- intersect(tree_tip_labels, comadre_iucn_pruned_tip_labels)
+matching_labels <- intersect(tree_tip_labels, comadre_iucn_tip_labels)
 
-# Display the matching tip labels
+# Displaying the matching tip labels
 print(matching_labels)
 
-# Check if there are any tip labels in comadre_iucn_pruned that are not in the tree
-missing_labels <- setdiff(comadre_iucn_pruned_tip_labels, tree_tip_labels)
+# Checking if there are any tip labels in comadre_iucn that are not in the tree
+missing_labels <- setdiff(comadre_iucn_tip_labels, tree_tip_labels)
 print(missing_labels)
-#which is why the tree I plotted only has 23 tips 
-#all the labels in comadre_iucn pruned are not in the tree. why? 
 
 # Check if there are any tip labels in the tree that are not in comadre_iucn_pruned
-extra_labels <- setdiff(tree_tip_labels, comadre_iucn_pruned_tip_labels)
+extra_labels <- setdiff(tree_tip_labels, comadre_iucn_tip_labels)
 print(extra_labels)
 ```
-```{r}
 
-#So naturally it seems like we are missing some from our object, which are not present in the tree.?
-comadre_iucn_pruned$OTL_unique_name[which(comadre_iucn_pruned$OTL_unique_name%in%pruned_tree$tip.label==F)]
-#Locating all the items that are in one of the datasets and not the other one and outputting this. The function %in%: for every slot in the first vector, are you present in the second vector? Asking if all the species are present in the phylogeny. We want to get rid of the species that aren't present, dont want to plot them in the phylogeny. 
-#So we now have to elimnate "Canis lupus" and "Theropithecus gelada" from our data to proceed with the next steps:
 
-#output is Scleprous mucronatus mucronatus
-#so we have to remove this from the plotting? 
-comadre_iucn_pruned <- comadre_iucn_pruned[-which(comadre_iucn_pruned$OTL_unique_name%in%pruned_tree$tip.label==F),]
-#We are matching the tip labels of the pruned tree to the unique names of the IUCN list: modifying the subset so the order of species matches the order in the phylogeny so we can map the two against eachother? 
-dim(comadre_iucn_pruned)
+```{r, echo = FALSE}
 
-#Next, we need to reorder the comadre_iucn order so the species appear in the same order in which they appear in the tree
-comadre_iucn_pruned <- comadre_iucn_pruned[match(pruned_tree$tip.label,comadre_iucn_pruned$OTL_unique_name),]
-dim(comadre_iucn_pruned)
 
-#Checking that the order is the same between the object and the tree
-comadre_iucn_pruned$OTL_unique_name
+comadre_iucn$OTL_unique_name[which(comadre_iucn$OTL_unique_name%in%pruned_tree$tip.label==F)]
+#Locating all the items that are in one of the datasets and not the other one and outputting this. The function %in% says for every slot in the first vector, are you present in the second vector? Asking if all the species are present in the phylogeny. 
+
+comadre_iucn <- comadre_iucn[-which(comadre_iucn$OTL_unique_name%in%pruned_tree$tip.label==F),]
+#We are matching the tip labels of the pruned tree to the unique names of the IUCN list. We are modifying the subset so the order of species matches the order in the phylogeny so we can map the two against eachother. 
+dim(comadre_iucn)
+
+#Next, we need will reorder the comadre_iucn order so the species appear in the same order in which they appear in the tree
+comadre_iucn <- comadre_iucn[match(pruned_tree$tip.label,comadre_iucn$OTL_unique_name),]
+dim(comadre_iucn)
+
+#Ensuring that the order is the same between the object and the tree
+comadre_iucn$OTL_unique_name
 pruned_tree$tip.label
-#they are in the same order
+#they are in the same order, so we can proceed to the next steps. 
 
-# Let us now plot the values of population growth rate at the tips of the phylogeny, and reconstruct the ancestral state of the originating lineange
-log_lambdas <- log(setNames(comadre_iucn_pruned$lambda, rownames(comadre_iucn_pruned)))
-#setting names and then log transform: creating an object called log lambdas which has the species name and the value of log lambda 
+#I will now plot the values of population growth rate at the tips of the phylogeny, and reconstruct the ancestral state of the originating lineage
+log_lambdas <- log(setNames(comadre_iucn$lambda, rownames(comadre_iucn)))
+#creating an object called log lambdas which has the species name and the value of log lambda, the log of population growth rate 
 
 # create "contMap" object, which allows for the reconstruction of likely ancestral traits
-#my_tree2<-di2multi(pruned.tree)?
 
-#We are now visually plotting the value of log lambda against the phylogeny of mammal species where values in red correspond to high values of population growth rate and values in y are relatively low. Is there a pattern? Same population growth rate across one clade, or no? Should you expect that performance of a population should be the same for all primates or all wild cats or all corals? Should there be phylogenetic grouping for phylogenetic grouping? 
+#We will now visually plot the value of log lambda against the phylogeny of reptile species where values in red correspond to high values of population growth rate and values in yellow are relatively low. 
+
+#Is there a pattern? Same population growth rate across one clade, or no? Should you expect that performance of a population should be the same for all primates or all wild cats or all corals? Should there be phylogenetic grouping?
 
 mammal_contMap_lambda <- contMap(pruned_tree, log_lambdas,plot=FALSE,res=200)
 mammal_contMap_lambda <- setMap(mammal_contMap_lambda, c("white","#FFFFB2","#FECC5C","#FD8D3C","#E31A1C"))
@@ -554,7 +558,7 @@ par(mar=c(5.1,4.1,4.1,2.1)) ## reset margins to default
 #Chelonia mydas and Caretta caretta show high population growth rate and they are in the same clade 
 
 #Let's do the same thing for generation time
-log_gen_T <- log(setNames(comadre_iucn_pruned$gen_T, rownames(comadre_iucn_pruned)))
+log_gen_T <- log(setNames(comadre_iucn$gen_T, rownames(comadre_iucn)))
 mammal_contMap_gen_T <- contMap(pruned_tree, log_gen_T,plot=FALSE,res=200)
 mammal_contMap_gent_T <- setMap(mammal_contMap_gen_T, c("white","light blue","blue","violet","purple"))
 plot(mammal_contMap_gent_T, fsize=c(0.7,0.8), leg.txt="log(generation time) (years)")
@@ -564,21 +568,26 @@ plot(mammal_contMap_gent_T, fsize=c(0.7,0.8), leg.txt="log(generation time) (yea
 
 
 ```
-Question 5 
-5. Create a new variable called “Population_performance”. Assign “Decline” or “Increase” to those species whose unique population growth rate is <1 or >1, respectively. This variable is no longer continuous (like population growth rate, lambda was in your original R MarkDown). 
+Phylogenetic inertia is the limitations on future evolutionary pathways imposed by previous adaptations. There is evidence of phylogenetic inertia for generation time. Generation times change gradually across evolutionary time but change is constrained within clades. More closely related species within the same clade have more similar generation times resulting in clustering of traits in the tree. For example Xenosaurus platycepts are more closely related to each other and share a low log generation time. Generation time is constrained within clades since closely related species must have similar generation times in order to be able to reproduce. 
 
-```{r}
+There is little evidence of phylogenetic inertia for population growth rate, as there is little clustering of different population growth rates along lineages in this tree. This is expected as population growth rate is controlled by environmental factors. 
 
-# Creating an empty vector to store the values of the new variable
-# Creating an empty vector to store the values of the new variable
+
+
+QUESTION 5 
+
+```{r, echo = FALSE}
+#Making a new variable called population performance where if lambda is greater than 1 it is assigned Increase, and if lambda is less than 1 Population performance is assigned decline. 
+# Creating an empty vector to store the values of the new variable Population performance 
+
 new_variable <- vector()
 
 # Iterating over each row in the data frame
-for (i in 1:nrow(comadre_iucn_pruned)) {
+for (i in 1:nrow(comadre_iucn)) {
   # Checking the value of lambda for each species
-  if (comadre_iucn_pruned$lambda[i] > 1) {
+  if (comadre_iucn$lambda[i] > 1) {
     new_variable <- c(new_variable, 'Increase')
-  } else if (comadre_iucn_pruned$lambda[i] < 1) {
+  } else if (comadre_iucn$lambda[i] < 1) {
     new_variable <- c(new_variable, 'Decline')
   }
 }
@@ -586,12 +595,39 @@ for (i in 1:nrow(comadre_iucn_pruned)) {
 #need to explain what this for loop is doing 
 
 # Adding the new variable to the data frame
-comadre_iucn_pruned$Population_performance <- new_variable
+comadre_iucn$Population_performance <- new_variable
 
 # Displaying the updated data frame
-print(comadre_iucn_pruned)
-dim(comadre_iucn_pruned)
-head(comadre_iucn_pruned)
+print(comadre_iucn)
+dim(comadre_iucn)
+head(comadre_iucn)
+```
+
+```{r, echo = FALSE}
+#Creating a new variable called Population_performance_colour
+
+# Creating an empty vector to store the values of the new variable
+population_performance_colour <- vector()
+
+# Iterating over each value in the Population_performance variable
+for (i in 1:length(comadre_iucn$Population_performance)) {
+  # Checking the value of Population_performance for each species
+  if (comadre_iucn$Population_performance[i] == 'Increase') {
+    population_performance_colour <- c(population_performance_colour, 'blue')
+  } else if (comadre_iucn$Population_performance[i] == 'Decline') {
+    population_performance_colour <- c(population_performance_colour, 'red')
+  }
+}
+
+# Adding the new variable to the data frame
+comadre_iucn$Population_performance_colour <- population_performance_colour
+
+# Displaying the updated data frame
+print(comadre_iucn)
+
+#assigning a colour to population performance where blue is for Increase and red is for Decline 
+
+
 ```
 Explore in this handy website (http://blog.phytools.org) a way to plot that new trait on your phylogenetic tree. Then add another column to the phylogeny in such a way that you show the conservation status of those species (collected in previous steps from the IUCN). See picture below for reference/inspiration
 
@@ -691,27 +727,27 @@ axisPhylo()
 ```
 
 
-```{r}
-head(comadre_iucn_pruned)
-```
 
-```{r}
-library(dplyr)
 
-comadre_iucn_prunedfortree <- comadre_iucn_pruned %>%
+```{r, echo = FALSE}
+#Changing IUCN status to letters for better visualisation 
+comadre_iucn <- comadre_iucn %>%
   mutate(IUCNstatus = case_when(
     IUCNstatus == "Endangered" ~ "EN",
     IUCNstatus == "Vulnerable" ~ "VU",
     IUCNstatus == "Near Threatened" ~ "NT",
     IUCNstatus == "Least Concern" ~ "LC",
     IUCNstatus == "Not Assessed" ~ "NA",
+    is.na(IUCNstatus) ~ "NA",  # Change NA values to "NA"
     TRUE ~ IUCNstatus  # Keep unchanged if not matched
   ))
 
-head(comadre_iucn_prunedfortree)
+head(comadre_iucn)
 
 
 ```
+
+
 Plotting IUCN status onto my tree 
 
 ```{r}
@@ -752,7 +788,529 @@ text(x = par("usr")[1] + 0.1, y = par("usr")[3] + 0.1, labels = comadre_iucn_pru
 axisPhylo()
 
 
+```
+
+
+```{r}
+#using a new function to assign labels to my phylogenetic tree 
+plotTree.lollipop<-function(tree,x,
+  args.plotTree=list(),args.lollipop=list(),...){
+  if(!inherits(x,c("matrix","data.frame"))) x<-as.matrix(x)
+  h<-max(nodeHeights(tree))
+  if(hasArg(panel_height)) panel_height<-list(...)$panel_height
+  else panel_height<-1.0
+  panel_height<-panel_height*h
+  args.plotTree$tree<-tree
+  args.plotTree$direction<-"upwards"
+  if(is.null(args.plotTree$mar)) 
+    args.plotTree$mar<-c(0.1,5.1,0.1,0.1)
+  if(is.null(args.plotTree$ylim)) 
+    args.plotTree$ylim<-c(0,h+ncol(x)*panel_height)
+  if(is.null(args.plotTree$ftype)) 
+    args.plotTree$ftype<-"off"
+  if(is.null(args.plotTree$lwd)) args.plotTree$lwd<-1
+  do.call(plotTree,args.plotTree)
+  pp<-get("last_plot.phylo",envir=.PlotPhyloEnv)
+  if(pp$font){
+    dx<-abs(diff(pp$x.lim))
+    pdin<-par()$din[2]
+    sh<-(pp$cex*strwidth(paste(" ",tree$tip.label,sep=""))+
+      0.3*pp$cex*strwidth("W"))*(par()$din[1]/par()$din[2])*
+      (diff(par()$usr[3:4])/diff(par()$usr[1:2]))
+    new_h<-h+max(sh)
+    panel_height<-(h-new_h+ncol(x)*panel_height)/ncol(x)
+    h<-new_h
+  }
+  if(hasArg(ylab)) ylab<-list(...)$ylab
+  else ylab<-if(!is.null(colnames(x))) 
+    colnames(x) else rep("",ncol(x))
+  for(i in ncol(x):1){
+    d<-max(c(diff(range(x[,i])),max(x[,i])))
+    y<-setNames(x[,i]/d*0.8*panel_height,rownames(x))
+    lower<-h+(i-1)*panel_height+panel_height*0.05
+    upper<-h+(i-1)*panel_height+panel_height*0.95
+    polygon(c(0,max(pp$xx)+1,max(pp$xx)+1,0),
+      c(lower,lower,upper,upper),
+      border=FALSE,col="#F2F2F2")
+    hh<-lower-min(c(0,min(y)))+0.05*panel_height
+    lines(range(pp$xx),rep(hh,2),col="black",lty="dotted")
+    segments(x0=pp$xx[1:Ntip(tree)],y0=rep(hh,Ntip(tree)),
+      x1=pp$xx[1:Ntip(tree)],y1=y[tree$tip.label]+hh)
+    labs<-pretty(c(min(c(0,min(x[,i]))),x[,i]),n=4)
+    labs[!(labs>max(x[,i]))]->labs
+    labs[!(labs<min(c(0,min(x[,i]))))]->labs
+    axis(2,at=hh+max(y)/max(x[,i])*labs,
+      labels=labs,las=1,cex.axis=0.6)
+    args.lollipop$bg<-setNames(
+      viridisLite::viridis(n=100)[ceiling(99*((y-
+          min(y))/diff(range(y))))+1],
+      names(y))
+    args.lollipop$bg<-args.lollipop$bg[tree$tip.label]
+    if(is.null(args.lollipop$pch)) args.lollipop$pch<-21
+    if(is.null(args.lollipop$cex)) args.lollipop$cex<-1.2
+    args.lollipop$x<-pp$xx[1:Ntip(tree)]
+    args.lollipop$y<-y[tree$tip.label]+hh
+    do.call(points,args.lollipop)
+    mtext(ylab[i],2,line=3,at=mean(hh+max(y)/
+      max(x[,i])*labs),cex=0.8)
+  }
+}
+
+
+```
+
+
+```{r}
+
+
+```
+
+
+```{r}
+library(phytools)
+
+new_pruned_tree<-as.phylo(pruned_tree)
+new_pruned_tree<-cbind(phyl.resid(new_pruned_tree,
+  x=as.matrix(pruned_tree[,"Population_performance",drop=FALSE]),
+  Y=as.matrix(pruned_tree[,c(6,4,2)]))$resid,
+  exp(pruned_tree[,"Population_performance",drop=FALSE]))
+
+
+```
+
+```{r}
+
+plotTree.lollipop(pruned_tree,log(pruned_tree),
+  ylab=c("IUCN status","Population growth rate"),
+  args.plotTree=list(fsize=0.7,ftype="i"),
+  args.lollipop=list(cex=1.5),
+  panel_height=2.5)
+
+
+```
+
+```{r}
+# Assuming pruned_tree is your phylogenetic tree object
+# Assuming comadre_iucn_pruned is your dataframe containing Population_performance and IUCNstatus columns
+
+# Load the ape package if not already loaded
+library(ape)
+
+# Plot the phylogenetic tree with tip labels
+plot(pruned_tree, show.tip.label = TRUE)
+
+# Define colors for Increase and Decrease
+cols <- c(Increase = "blue", Decrease = "red")
+
+# Define colors for IUCN status
+cols_iucn <- c("EN" = "red", "VU" = "orange", "NT" = "green", "LC" = "blue", "NA" = "gray")
+
+# Add tip labels for IUCN status
+tiplabels(pch = 22, col = cols_iucn[comadre_iucn_pruned$iucn_colour], cex = 1.5, adj = 0)
+
+# Create custom labels based on Population_performance
+lambda_values <- ifelse(comadre_iucn_pruned$Population_performance > 1, "Increase", "Decrease")
+
+# Create node labels based on custom labels
+node_labels <- ifelse(lambda_values == "Increase", ">1", "<1")
+
+# Add node labels
+nodelabels(node_labels, cex = 1.5)
+
+# Add legend for Population_performance
+legend("bottomleft", legend = c("Increase", "Decrease"), pch = 22, col = c("blue", "red"), title = "Population Performance", cex = 0.8)
+
+# Add legend for IUCN status
+legend("bottomright", legend = names(cols_iucn), pch = 22, col = cols_iucn, title = "IUCN Status", cex = 0.8)
+
+# Add axis
+axisPhylo()
+
+```
+
+```{r}
+# Load the ape package if not already loaded
+library(ape)
+
+# Match the row names of the tree with the species names in the dataset
+tip_labels <- match(comadre_iucn_pruned$Species, pruned_tree$tip.label)
+
+# Assign tip labels to the tree
+pruned_tree$tip.label <- comadre_iucn_pruned$Species[tip_labels]
+
+# Plot the phylogenetic tree with tip labels
+plot(pruned_tree, show.tip.label = TRUE)
+
+# Define colors for Population_performance and IUCNstatus
+cols_population <- c(Increase = "blue", Decline = "red")
+cols_iucn <- c("EN" = "red", "VU" = "orange", "NT" = "green", "LC" = "blue", "NA" = "gray")
+
+# Add tip labels for Population_performance
+tiplabels(pch = 22, col = cols_population[comadre_iucn_pruned$Population_performance[tip_labels]], cex = 1.5, adj = 0)
+
+# Add tip labels for IUCNstatus
+tiplabels(pch = 22, col = cols_iucn[comadre_iucn_pruned$IUCNstatus[tip_labels]], cex = 1.5, adj = 1)
+
+# Add axis
+axisPhylo()
+
 
 
 
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+```{r}
+# Plot the tree
+plot(pruned_tree, show.tip.label = TRUE, cex = 0.4)
+
+# Plot tip labels with species names
+tiplabels(pch = 22, text = comadre_iucn$IUCNstatus, bg = "white", cex = 0.5, adj = c(-7, 0.5))
+
+# Get the maximum y-axis value of the plot
+max_y <- max(par()$usr[3], par()$usr[4])
+
+# Add legend for Population performance above the plot
+legend("top", legend = unique(comadre_iucn$Population_performance), 
+       pch = 22, 
+       col = ifelse(unique(comadre_iucn$Population_performance) == "Decline", "red", "blue"), 
+       pt.bg = "white", title = "Population performance", y = max_y + 0.1)
+
+# Add Population_performance_colour information
+tiplabels(pch = 22, text = "", col = comadre_iucn$Population_performance_colour, 
+          bg = comadre_iucn$Population_performance_colour, cex = 1.2, add = TRUE)
+
+
+```
+
+Changing the parameters 
+```{r}
+# Plot the tree
+plot(pruned_tree, show.tip.label = TRUE, cex = 0.4, adj = c(0.5, 0.5))
+
+# Plot tip labels with species names
+tiplabels(pch = 22, text = comadre_iucn$IUCNstatus, bg = "white", cex = 0.5, adj = c(-8, 0.5))
+
+# Get the maximum y-axis value of the plot
+max_y <- max(par()$usr[3], par()$usr[4])
+
+# Add legend for Population performance above the plot
+legend("top", legend = unique(comadre_iucn$Population_performance), 
+       pch = 22, 
+       col = ifelse(unique(comadre_iucn$Population_performance) == "Decline", "red", "blue"), 
+       pt.bg = "white", title = "Population performance", y = max_y + 1)
+
+# Add Population_performance_colour information
+tiplabels(pch = 22, text = "", col = comadre_iucn$Population_performance_colour, 
+          bg = comadre_iucn$Population_performance_colour, cex = 0.8, add = TRUE)
+
+```
+```{r}
+
+# Plot the tree
+plot(pruned_tree, show.tip.label = TRUE, cex = 0.4, adj = c(0.5, 0.5))
+
+# Plot tip labels with species names
+tiplabels(pch = 22, text = comadre_iucn$IUCNstatus, bg = "white", cex = 0.5, adj = c(-8, 0.5))
+
+# Get the maximum y-axis value of the plot
+max_y <- max(par()$usr[2], par()$usr[2])
+max_y <- max_y - 2
+
+# Add legend for Population performance above the plot
+legend(x = "topright", y = max_y, # Adjust y value as needed
+       legend = unique(comadre_iucn$Population_performance), 
+       pch = 22, 
+       col = ifelse(unique(comadre_iucn$Population_performance) == "Decline", "red", "blue"), 
+       pt.bg = "white", title = "Population performance")
+
+# Add Population_performance_colour information
+tiplabels(pch = 22, text = "", col = comadre_iucn$Population_performance_colour, 
+          bg = comadre_iucn$Population_performance_colour, cex = 0.8, add = TRUE)
+
+
+```
+```{r}
+new_scaled_tree <- pruned_tree
+
+#adjusting the branch lengths 
+scaling_factor <- 10 
+new_scaled_tree$edge.length <- new_scaled_tree$edge.length * scaling_factor
+
+png("phylogeny_large.png", width = 1400, height = 1200)
+
+#plot the scaled phylogeny 
+plot(new_scaled_tree, type = "phylogram", label.offset = 0.08, cex =)
+
+#Adding tip labels for IUCN status and aligning them with the right edge of the plot 
+
+tiplabels(text = comadre_iucn$IUCNstatus,
+          col = comadre_iucn$iucn_colour,
+          cex = 1.1,
+          frame = "none",
+          bg = "transparent",
+          font = 1.8,
+          adj = -0.44) 
+
+#Add tip labels for population performance colour 
+
+tiplabels(pch = 16, col = comadre_iucn$Population_performance_colour, cex = 1.3) 
+
+#defining the legend labels and colours 
+
+legend_colors <- c("red", "blue")
+legend_labels <- c("Decrease", "Increase")
+
+#defining the other legend labels and colours 
+
+iucn_status_legend <- c("black", "darkred", "mediumorchid", "darkorange", "darkgreen")
+iucn_status_legend_labels <- c("LC = Least Concern", "EN = Endangered", "VU = Vulnerable", "NT = Near Threatened", "NA = Not Applicable")
+
+#plotting these legends onto the plot 
+
+legend("topright", legend = legend_labels, pch = 15, col = legend_colors,
+       title = "Population Performance", cex = 1, inset = c(0, 0.135))
+
+legend("topright", legend = iucn_status_legend_labels, pch = 15, col = iucn_status_legend,
+       title = "IUCN status", cex = 1, text.col = iucn_status_legend, pt.bg = "transparent")
+
+
+
+
+
+dev.off()
+
+
+
+```
+
+
+
+```{r}
+head(comadre_iucn)
+
+```
+
+
+Example on how to do this from website: 
+
+```{r}
+data(pruned_tree)
+pruned_tree$tip.label
+comadre_iucn$IUCNstatus
+
+iucn <- setNames(pruned_tree$tip.label, c("VU", "LC", "EN", "VU", "EN", "LC", "LC", "LC", "LC", "NA", "NA", "NA", "NA", "VU", "LC", "VU", "LC", "LC", "LC", "LC", "VU", "EN", "VU"))
+
+lambda <- setNames(pruned_tree$tip.label, c("Increase", "Increase", "Increase", "Increase", "Decline", "Decline", "Increase", "Decline", "Decline", "Decline", "Decline", "Decline", "Increase", "Increase", "Decline", "Increase", "Increase", "Decline", "Increase", "Decline", "Increase", "Increase", "Increase"))
+
+plotTree(pruned_tree, ftype= "i")
+
+pp <- get("pruned_tree")
+pp$x.lim
+pruned_tree$xlim
+pp$y.lim
+
+# Manually set the x-axis limits
+custom_xlim <- c(0, 507)  # Replace minimum_value and maximum_value with your desired limits
+custom_ylim <- (c(1, 26)
+
+
+
+# Further code for customizing the plot...
+
+        
+
+
+```
+
+```{r}
+
+## graph the tree, updating xlim & ylim
+plotTree(pruned_tree, ftype = "off",
+         xlim = c(0, 507),
+         ylim = c(1, 26)
+
+
+plotTree(pruned_tree, ftype="off")
+## pull the last plotted phylo info
+pp<-get("pruned_tree")
+## compute the string width in user units of our
+## labels
+sw<-sapply(pruned_tree$tip.label,strwidth,font=3)
+## right align & re-graph our labels (this just 
+## looks nicer)
+par(lend=1)
+for(i in 1:Ntip(pruned_tree)){
+  text(x=pp$xx[i]+1.05*max(sw),y=pp$yy[i],
+    pruned_tree$tip.label[i],cex=0.9,font=3,
+    pos=2)
+  segments(pp$xx[i],pp$yy[i],pp$xx[i]+max(sw)-sw[i],
+    pp$yy[i],lty="dotted")
+}
+## sort our lambda values & discretize them as 
+## > 1 (increasing) or < 1 (decreasing)
+lambda<-lambda[pruned_tree$tip.label]
+foo<-function(x) if(x>1) "white" else "black"
+lam_col<-sapply(lambda,foo)
+## graph the levels using points (this could 
+## also be done more scientifically with e.g.,
+## plotrix::draw.circle)
+## the specific coordinates might need adjustment
+points(pp$xx[1:Ntip(pruned_tree)]+
+    1.05*max(sw)+0.02*max(nodeHeights(pruned_tree)),
+  pp$yy[1:Ntip(pruned_tree)],pch=21,bg=lam_col,
+  cex=2.2)
+## now add IUCN status as text. Once again, the 
+## font size & offset might need adjustment 
+## depending on the case
+text(pp$xx[1:Ntip(pruned_tree)]+
+    1.05*max(sw)+0.08*max(nodeHeights(pruned_tree)),
+  pp$yy[1:Ntip(pruned_tree)],
+  iucn[pruned_tree$tip.label])
+## finall, column headers & legend
+text(pp$xx[1:Ntip(pruned_tree)]+
+    max(sw)+0.01*max(nodeHeights(pruned_tree)),
+  max(pp$yy)+0.75,expression(paste(lambda," (growth)")),
+  srt=80,pos=4)
+text(pp$xx[1:Ntip(pruned_tree)]+
+    max(sw)+0.07*max(nodeHeights(pruned_tree)),
+  max(pp$yy)+0.75,"IUCN status",srt=80,
+  pos=4)
+legend("topleft",c("decreasing","increasing"),pch=21,
+  pt.bg=c("black","white"),pt.cex=2,bty="n",inset=0.05)
+```
+
+```{r}
+
+plotTree(pruned_tree, ftype="off")
+## pull the last plotted phylo info
+pp <- pruned_tree
+## compute the string width in user units of our
+## labels
+sw <- sapply(pruned_tree$tip.label, strwidth, font = 3)
+## right align & re-graph our labels (this just 
+## looks nicer)
+par(lend=1)
+for(i in 1:Ntip(pruned_tree)){
+  # Manually define x and y coordinates
+  x_coord <- 10  # Example x coordinate
+  y_coord <- 5   # Example y coordinate
+  
+  text(x = x_coord, y = y_coord,
+       labels = pruned_tree$tip.label[i],
+       cex = 0.9, font = 3, pos = 2)
+  
+  # Define the starting and ending points for the dotted line
+  start_x <- pp$xx[i]
+  end_x <- pp$xx[i] + max(sw) - sw[i]
+  y <- pp$yy[i]
+  
+  # Draw the dotted line
+  segments(x0 = start_x, y0 = y, x1 = end_x, y1 = y, lty = "dotted")
+}
+
+
+## sort our lambda values & discretize them as 
+## > 1 (increasing) or < 1 (decreasing)
+lambda <- lambda[pruned_tree$tip.label]
+foo <- function(x) if(x>1) "white" else "black"
+lam_col <- sapply(lambda, foo)
+## graph the levels using points (this could 
+## also be done more scientifically with e.g.,
+## plotrix::draw.circle)
+## the specific coordinates might need adjustment
+points(pp$xx[1:Ntip(pruned_tree)]+
+    1.05*max(sw)+0.02*max(nodeHeights(pruned_tree)),
+  pp$yy[1:Ntip(pruned_tree)], pch=21, bg=lam_col,
+  cex=2.2)
+## now add IUCN status as text. Once again, the 
+## font size & offset might need adjustment 
+## depending on the case
+text(pp$xx[1:Ntip(pruned_tree)]+
+    1.05*max(sw)+0.08*max(nodeHeights(pruned_tree)),
+  pp$yy[1:Ntip(pruned_tree)],
+  iucn[pruned_tree$tip.label])
+## finall, column headers & legend
+text(pp$xx[1:Ntip(pruned_tree)]+
+    max(sw)+0.01*max(nodeHeights(pruned_tree)),
+  max(pp$yy)+0.75, expression(paste(lambda," (growth)")),
+  srt=80, pos=4)
+text(pp$xx[1:Ntip(pruned_tree)]+
+    max(sw)+0.07*max(nodeHeights(pruned_tree)),
+  max(pp$yy)+0.75, "IUCN status", srt=80,
+  pos=4)
+legend("topleft", c("decreasing", "increasing"), pch=21,
+  pt.bg=c("black", "white"), pt.cex=2, bty="n", inset=0.05)
+
+```
+
+Another way of plotting the tree: 
+
+```{r}
+x <- as.matrix(pruned_tree, row.names=1)[,1] #converts the pruned_tree into a matrix format with row names set to tip labels of the phylogenetic tree and extracts the first column of the matrix. Resulting x variable contains distances from root to tips of the tree
+
+dotTree(pruned_tree,x,length=10,ftype="i") #dotTree function used to generate a dot representation of the phylogenetic tree
+
+# Combine IUCN status and Population_performance_colour into a single string
+label_text <- paste(comadre_iucn$IUCNstatus, comadre_iucn$Population_performance_colour, sep = ": ")
+
+# Plot the dot representation of the tree with additional labels
+dotTree(pruned_tree, x, length = 10, ftype = "i", tip.labels = label_text)
+
+
+```
+
+```{r}
+
+# Create a data frame containing tip labels and their associated traits
+tip_data <- data.frame(
+  tip.label = pruned_tree$tip.label,
+  IUCN_status = comadre_iucn$IUCNstatus,
+  Population_performance_colour = comadre_iucn$Population_performance_colour
+)
+
+# Combine information into a single label
+tip_data$label_text <- paste(tip_data$IUCN_status, tip_data$Population_performance_colour, sep = ": ")
+
+# Plot the dot representation of the tree with custom tip labels
+dotTree(pruned_tree, x, length = 10, ftype = "i", 
+         nodelabels = tip_data$label_text)
+
+
+```
+
+One more try using a different approach 
+```{r}
+library(phytools)
+pruned_tree
+new_pruned_tree <-as.phylo(pruned_tree)
+new_pruned_tree
+iucn<-setNames(comadre_iucn$IUCNstatus,rownames(comadre_iucn))
+iucn
+
+to.matrix(iucn, levels(iucn))
+```
+
+
+
+
+
+
+
